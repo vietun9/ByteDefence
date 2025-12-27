@@ -1,0 +1,211 @@
+@page "/books/edit/{Id}"
+@using BookStore.BlazorClient.Models
+@using BookStore.BlazorClient.Services
+@inject BookStoreGraphQLService GraphQLService
+@inject NavigationManager Navigation
+
+<PageTitle>Edit Book</PageTitle>
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="books">Books</a></li>
+        <li class="breadcrumb-item"><a href="@($"books/{Id}")">@(formModel?.Title ?? "Book")</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Edit</li>
+    </ol>
+</nav>
+
+<h1>Edit Book</h1>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (formModel == null)
+{
+    <div class="alert alert-warning">
+        Book not found. <a href="books">Back to Books</a>
+    </div>
+}
+else
+{
+    <EditForm Model="@formModel" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        
+        <div class="row">
+            <div class="col-md-8">
+                <div class="mb-3">
+                    <label for="title" class="form-label">Title *</label>
+                    <InputText id="title" class="form-control" @bind-Value="formModel.Title" required />
+                    <ValidationMessage For="@(() => formModel.Title)" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <InputTextArea id="description" class="form-control" rows="4" @bind-Value="formModel.Description" />
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="isbn" class="form-label">ISBN</label>
+                            <InputText id="isbn" class="form-control" @bind-Value="formModel.Isbn" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="publishedYear" class="form-label">Published Year *</label>
+                            <InputNumber id="publishedYear" class="form-control" @bind-Value="formModel.PublishedYear" />
+                            <ValidationMessage For="@(() => formModel.PublishedYear)" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="author" class="form-label">Author *</label>
+                            <InputSelect id="author" class="form-select" @bind-Value="formModel.AuthorId">
+                                <option value="">-- Select Author --</option>
+                                @foreach (var author in authors)
+                                {
+                                    <option value="@author.Id">@author.Name</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => formModel.AuthorId)" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <InputSelect id="status" class="form-select" @bind-Value="formModel.Status">
+                                @foreach (var status in Enum.GetValues<BookStatus>())
+                                {
+                                    <option value="@status">@status</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary me-2" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Save Changes
+                    </button>
+                    <a href="@($"books/{Id}")" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+
+    private BookFormModel? formModel;
+    private List<Author> authors = new();
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authorsTask = GraphQLService.GetAuthorsAsync();
+            var bookTask = GraphQLService.GetBookByIdAsync(Id);
+
+            await Task.WhenAll(authorsTask, bookTask);
+
+            authors = await authorsTask;
+            var book = await bookTask;
+
+            if (book != null)
+            {
+                formModel = new BookFormModel
+                {
+                    Title = book.Title,
+                    Description = book.Description,
+                    Isbn = book.Isbn,
+                    PublishedYear = book.PublishedYear,
+                    AuthorId = book.AuthorId,
+                    Status = book.Status
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (formModel == null) return;
+
+        isSubmitting = true;
+        errorMessage = null;
+
+        try
+        {
+            var input = new UpdateBookInput(
+                Id,
+                formModel.Title,
+                formModel.Description,
+                formModel.Isbn,
+                formModel.PublishedYear,
+                formModel.AuthorId,
+                formModel.Status
+            );
+
+            var result = await GraphQLService.UpdateBookAsync(input);
+
+            if (result.Book != null)
+            {
+                Navigation.NavigateTo($"books/{Id}");
+            }
+            else if (result.Errors.Any())
+            {
+                errorMessage = string.Join(", ", result.Errors.Select(e => e.Message));
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private class BookFormModel
+    {
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? Isbn { get; set; }
+        public int PublishedYear { get; set; } = DateTime.Now.Year;
+        public string AuthorId { get; set; } = string.Empty;
+        public BookStatus Status { get; set; } = BookStatus.DRAFT;
+    }
+}

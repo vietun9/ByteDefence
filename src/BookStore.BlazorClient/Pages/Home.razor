@@ -1,0 +1,55 @@
+﻿@page "/"
+
+<PageTitle>BookStore - Home</PageTitle>
+
+<h1>Welcome to BookStore</h1>
+
+<p class="lead">
+    A GraphQL-powered book management application built with Azure Functions and Blazor WebAssembly.
+</p>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Browse Books</h5>
+                <p class="card-text">View all available books in our catalog with author information and reviews.</p>
+                <a href="books" class="btn btn-primary">View Books</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Add New Book</h5>
+                <p class="card-text">Add a new book to the catalog with author and publication details.</p>
+                <a href="books/create" class="btn btn-success">Add Book</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">View Authors</h5>
+                <p class="card-text">Browse our collection of authors and their published works.</p>
+                <a href="authors" class="btn btn-secondary">View Authors</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Technology Stack</h5>
+                <p class="card-text">
+                    <strong>Backend:</strong> Azure Functions + HotChocolate GraphQL<br/>
+                    <strong>Frontend:</strong> Blazor WebAssembly<br/>
+                    <strong>Database:</strong> EF Core In-Memory<br/>
+                    <strong>Auth:</strong> Bearer Token (JWT/Demo)
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

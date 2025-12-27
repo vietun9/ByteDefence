@@ -1,0 +1,179 @@
+@page "/books/create"
+@using BookStore.BlazorClient.Models
+@using BookStore.BlazorClient.Services
+@inject BookStoreGraphQLService GraphQLService
+@inject NavigationManager Navigation
+
+<PageTitle>Add Book</PageTitle>
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="books">Books</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Add Book</li>
+    </ol>
+</nav>
+
+<h1>Add New Book</h1>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
+@if (isLoadingAuthors)
+{
+    <div class="d-flex justify-content-center my-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    <EditForm Model="@formModel" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        
+        <div class="row">
+            <div class="col-md-8">
+                <div class="mb-3">
+                    <label for="title" class="form-label">Title *</label>
+                    <InputText id="title" class="form-control" @bind-Value="formModel.Title" required />
+                    <ValidationMessage For="@(() => formModel.Title)" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <InputTextArea id="description" class="form-control" rows="4" @bind-Value="formModel.Description" />
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="isbn" class="form-label">ISBN</label>
+                            <InputText id="isbn" class="form-control" @bind-Value="formModel.Isbn" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="publishedYear" class="form-label">Published Year *</label>
+                            <InputNumber id="publishedYear" class="form-control" @bind-Value="formModel.PublishedYear" />
+                            <ValidationMessage For="@(() => formModel.PublishedYear)" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="author" class="form-label">Author *</label>
+                            <InputSelect id="author" class="form-select" @bind-Value="formModel.AuthorId">
+                                <option value="">-- Select Author --</option>
+                                @foreach (var author in authors)
+                                {
+                                    <option value="@author.Id">@author.Name</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => formModel.AuthorId)" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <InputSelect id="status" class="form-select" @bind-Value="formModel.Status">
+                                @foreach (var status in Enum.GetValues<BookStatus>())
+                                {
+                                    <option value="@status">@status</option>
+                                }
+                            </InputSelect>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-success me-2" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Create Book
+                    </button>
+                    <a href="books" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </div>
+        </div>
+    </EditForm>
+}
+
+@code {
+    private BookFormModel formModel = new();
+    private List<Author> authors = new();
+    private bool isLoadingAuthors = true;
+    private bool isSubmitting = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            authors = await GraphQLService.GetAuthorsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load authors: {ex.Message}";
+        }
+        finally
+        {
+            isLoadingAuthors = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        errorMessage = null;
+
+        try
+        {
+            var input = new CreateBookInput(
+                formModel.Title,
+                formModel.Description,
+                formModel.Isbn,
+                formModel.PublishedYear,
+                formModel.AuthorId,
+                formModel.Status
+            );
+
+            var result = await GraphQLService.CreateBookAsync(input);
+
+            if (result.Book != null)
+            {
+                Navigation.NavigateTo($"books/{result.Book.Id}");
+            }
+            else if (result.Errors.Any())
+            {
+                errorMessage = string.Join(", ", result.Errors.Select(e => e.Message));
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private class BookFormModel
+    {
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? Isbn { get; set; }
+        public int PublishedYear { get; set; } = DateTime.Now.Year;
+        public string AuthorId { get; set; } = string.Empty;
+        public BookStatus Status { get; set; } = BookStatus.DRAFT;
+    }
+}
