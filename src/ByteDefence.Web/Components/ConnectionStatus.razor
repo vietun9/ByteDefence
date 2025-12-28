@@ -1,0 +1,89 @@
+@using Microsoft.AspNetCore.SignalR.Client
+
+<div class="connection-status @GetStatusClass()">
+    <span class="status-dot"></span>
+    <span class="status-text">@GetStatusText()</span>
+</div>
+
+<style>
+    .connection-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .connection-status.connected {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+
+    .connection-status.connected .status-dot {
+        background: #4caf50;
+    }
+
+    .connection-status.disconnected {
+        background: #ffebee;
+        color: #c62828;
+    }
+
+    .connection-status.disconnected .status-dot {
+        background: #f44336;
+    }
+
+    .connection-status.reconnecting {
+        background: #fff3e0;
+        color: #e65100;
+    }
+
+    .connection-status.reconnecting .status-dot {
+        background: #ff9800;
+        animation: pulse 1s infinite;
+    }
+
+    .connection-status.connecting {
+        background: #e3f2fd;
+        color: #1565c0;
+    }
+
+    .connection-status.connecting .status-dot {
+        background: #2196f3;
+        animation: pulse 1s infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public HubConnectionState State { get; set; }
+
+    private string GetStatusClass() => State switch
+    {
+        HubConnectionState.Connected => "connected",
+        HubConnectionState.Disconnected => "disconnected",
+        HubConnectionState.Reconnecting => "reconnecting",
+        HubConnectionState.Connecting => "connecting",
+        _ => "disconnected"
+    };
+
+    private string GetStatusText() => State switch
+    {
+        HubConnectionState.Connected => "Live",
+        HubConnectionState.Disconnected => "Offline",
+        HubConnectionState.Reconnecting => "Reconnecting...",
+        HubConnectionState.Connecting => "Connecting...",
+        _ => "Offline"
+    };
+}

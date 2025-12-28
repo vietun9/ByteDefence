@@ -1,0 +1,17 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "UseCosmosDb": "false",
+    "SignalR__Mode": "Local",
+    "SignalR__HubUrl": "http://localhost:5000",
+    "Jwt__Secret": "ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!",
+    "Jwt__Issuer": "ByteDefence",
+    "Jwt__Audience": "ByteDefence-API"
+  },
+  "Host": {
+    "CORS": "*",
+    "CORSCredentials": false
+  }
+}

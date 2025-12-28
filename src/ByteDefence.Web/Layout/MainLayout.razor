@@ -1,0 +1,54 @@
+﻿@inherits LayoutComponentBase
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <AuthorizeView>
+                <Authorized>
+                    <span class="user-info">👤 @context.User.Identity?.Name</span>
+                    <button class="btn-logout" @onclick="Logout">Logout</button>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/login">Login</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<style>
+    .user-info {
+        margin-right: 1rem;
+    }
+
+    .btn-logout {
+        background: transparent;
+        border: 1px solid currentColor;
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        cursor: pointer;
+        color: inherit;
+    }
+
+    .btn-logout:hover {
+        background: rgba(255,255,255,0.1);
+    }
+</style>
+
+@code {
+    private async Task Logout()
+    {
+        await AuthService.ClearTokenAsync();
+        Navigation.NavigateTo("/login");
+    }
+}

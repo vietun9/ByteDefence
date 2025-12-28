@@ -1,0 +1,71 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# JetBrains Rider
+.idea/
+
+# VS Code
+.vscode/
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet Packages
+*.nupkg
+*.snupkg
+*.nuspec
+packages/
+!packages/repositories.config
+
+# Azure Functions
+local.settings.json
+!src/ByteDefence.Api/local.settings.json
+
+# Node.js (if using any JS tools)
+node_modules/
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
+
+# Coverage
+*.coverage
+*.coveragexml
+
+# Docker
+.docker/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Publish output
+publish/
+
+# Azure
+.azure/
