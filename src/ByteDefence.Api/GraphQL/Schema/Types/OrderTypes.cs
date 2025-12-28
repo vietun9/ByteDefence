@@ -1,4 +1,5 @@
 using ByteDefence.Api.Data;
+using ByteDefence.Api.GraphQL.DataLoaders;
 using ByteDefence.Shared.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,7 +32,7 @@ public class OrderType : ObjectType<Order>
             .Description("The line items in this order.");
 
         descriptor.Field(o => o.CreatedBy)
-            .ResolveWith<OrderResolvers>(r => r.GetCreatedBy(default!, default!))
+            .ResolveWith<OrderResolvers>(r => r.GetCreatedByAsync(default!, default!))
             .Description("The user who created this order.");
 
         descriptor.Field(o => o.Total)
@@ -51,12 +52,16 @@ public class OrderType : ObjectType<Order>
 
     private class OrderResolvers
     {
-        public async Task<User?> GetCreatedBy(
+        /// <summary>
+        /// Uses DataLoader to batch user lookups and solve N+1 query problem.
+        /// </summary>
+        public async Task<User?> GetCreatedByAsync(
             [Parent] Order order,
-            [Service] AppDbContext context)
+            UserByIdDataLoader userLoader)
         {
             if (order.CreatedBy != null) return order.CreatedBy;
-            return await context.Users.FindAsync(order.CreatedById);
+            if (string.IsNullOrEmpty(order.CreatedById)) return null;
+            return await userLoader.LoadAsync(order.CreatedById);
         }
     }
 }

@@ -19,6 +19,7 @@ public class GraphQLFunction
     private readonly ILogger<GraphQLFunction> _logger;
     private readonly IConfiguration _configuration;
     private readonly JsonResultFormatter _resultFormatter;
+    private readonly string[] _allowedOrigins;
 
     public GraphQLFunction(
         IRequestExecutorResolver executorResolver,
@@ -29,6 +30,10 @@ public class GraphQLFunction
         _logger = logger;
         _configuration = configuration;
         _resultFormatter = new JsonResultFormatter();
+        
+        // Load allowed origins from configuration (default to localhost for dev)
+        _allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+            ?? new[] { "http://localhost:5001", "http://localhost:5173", "https://localhost:5001" };
     }
 
     [Function("graphql")]
@@ -37,20 +42,21 @@ public class GraphQLFunction
     {
         _logger.LogInformation("GraphQL request received");
 
+        // Get the request origin for CORS
+        var origin = GetRequestOrigin(req);
+
         // Short-circuit CORS preflight
         if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
         {
             var preflight = req.CreateResponse(HttpStatusCode.OK);
-            preflight.Headers.Add("Access-Control-Allow-Origin", "*");
-            preflight.Headers.Add("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-            preflight.Headers.Add("Access-Control-Allow-Headers", "Content-Type,Authorization");
+            AddCorsHeaders(preflight, origin);
             return preflight;
         }
 
         // Handle GET requests for GraphQL Playground/Banana Cake Pop
         if (req.Method.Equals("GET", StringComparison.OrdinalIgnoreCase))
         {
-            return await HandlePlaygroundRequest(req);
+            return await HandlePlaygroundRequest(req, origin);
         }
 
         // Parse the GraphQL request
@@ -63,7 +69,7 @@ public class GraphQLFunction
         if (request == null || string.IsNullOrEmpty(request.Query))
         {
             var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-            AddCorsHeaders(badResponse);
+            AddCorsHeaders(badResponse, origin);
             await badResponse.WriteAsJsonAsync(new { errors = new[] { new { message = "Invalid GraphQL request" } } });
             return badResponse;
         }
@@ -101,7 +107,7 @@ public class GraphQLFunction
         // Create the response
         var response = req.CreateResponse(HttpStatusCode.OK);
         response.Headers.Add("Content-Type", "application/json");
-        AddCorsHeaders(response);
+        AddCorsHeaders(response, origin);
 
         // Serialize the result
         await using var stream = new MemoryStream();
@@ -113,6 +119,15 @@ public class GraphQLFunction
         await response.WriteStringAsync(jsonResult);
 
         return response;
+    }
+
+    private string? GetRequestOrigin(HttpRequestData req)
+    {
+        if (req.Headers.TryGetValues("Origin", out var origins))
+        {
+            return origins.FirstOrDefault();
+        }
+        return null;
     }
 
     private string? ExtractUserIdFromToken(HttpRequestData req)
@@ -155,11 +170,11 @@ public class GraphQLFunction
         }
     }
 
-    private async Task<HttpResponseData> HandlePlaygroundRequest(HttpRequestData req)
+    private async Task<HttpResponseData> HandlePlaygroundRequest(HttpRequestData req, string? origin)
     {
         var response = req.CreateResponse(HttpStatusCode.OK);
         response.Headers.Add("Content-Type", "application/json");
-        AddCorsHeaders(response);
+        AddCorsHeaders(response, origin);
 
         var info = new
         {
@@ -179,11 +194,23 @@ public class GraphQLFunction
         return response;
     }
 
-    private static void AddCorsHeaders(HttpResponseData response)
+    private void AddCorsHeaders(HttpResponseData response, string? requestOrigin)
     {
-        response.Headers.Add("Access-Control-Allow-Origin", "*");
+        // Use specific origin if it's in the allowed list, otherwise use first allowed origin
+        string corsOrigin;
+        if (!string.IsNullOrEmpty(requestOrigin) && _allowedOrigins.Contains(requestOrigin, StringComparer.OrdinalIgnoreCase))
+        {
+            corsOrigin = requestOrigin;
+        }
+        else
+        {
+            corsOrigin = _allowedOrigins.FirstOrDefault() ?? "http://localhost:5001";
+        }
+
+        response.Headers.Add("Access-Control-Allow-Origin", corsOrigin);
         response.Headers.Add("Access-Control-Allow-Headers", "Content-Type,Authorization");
         response.Headers.Add("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+        response.Headers.Add("Access-Control-Allow-Credentials", "true");
     }
 
     private static IReadOnlyDictionary<string, object?> NormalizeVariables(Dictionary<string, object?> variables)

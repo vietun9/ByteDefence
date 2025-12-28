@@ -1,5 +1,6 @@
 using ByteDefence.Api.Data;
 using ByteDefence.Api.GraphQL;
+using ByteDefence.Api.GraphQL.DataLoaders;
 using ByteDefence.Api.GraphQL.Schema.Mutations;
 using ByteDefence.Api.GraphQL.Schema.Queries;
 using ByteDefence.Api.GraphQL.Schema.Types;
@@ -48,6 +49,10 @@ public abstract class GraphQLIntegrationTestBase : IDisposable
         var dbName = $"ByteDefence_Test_{Guid.NewGuid()}";
         services.AddDbContext<AppDbContext>(options =>
             options.UseInMemoryDatabase(databaseName: dbName), ServiceLifetime.Singleton);
+        
+        // Also register DbContextFactory for parallel query support
+        services.AddDbContextFactory<AppDbContext>(options =>
+            options.UseInMemoryDatabase(databaseName: dbName), ServiceLifetime.Singleton);
 
         // Register services
         services.AddScoped<IOrderService, OrderService>();
@@ -55,7 +60,7 @@ public abstract class GraphQLIntegrationTestBase : IDisposable
         services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<INotificationService, LocalNotificationService>();
 
-        // Configure HotChocolate GraphQL
+        // Configure HotChocolate GraphQL with DataLoaders
         services
             .AddGraphQLServer()
             .AddQueryType<OrderQueryResolver>()
@@ -65,6 +70,7 @@ public abstract class GraphQLIntegrationTestBase : IDisposable
             .AddType<OrderType>()
             .AddType<OrderItemType>()
             .AddType<UserType>()
+            .AddDataLoader<UserByIdDataLoader>()
             .AddFiltering()
             .AddSorting()
             .AddErrorFilter<GraphQLErrorFilter>();

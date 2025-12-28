@@ -56,6 +56,9 @@ public class AppDbContext : DbContext
         var adminId = "admin-001";
         var userId = "user-001";
 
+        // Use fixed dates for deterministic seed data (avoids test flakiness)
+        var baseDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
         modelBuilder.Entity<User>().HasData(
             new User
             {
@@ -64,7 +67,7 @@ public class AppDbContext : DbContext
                 Email = "admin@bytedefence.com",
                 PasswordHash = AdminPasswordHash,
                 Role = UserRole.Admin,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = baseDate
             },
             new User
             {
@@ -73,7 +76,7 @@ public class AppDbContext : DbContext
                 Email = "user@bytedefence.com",
                 PasswordHash = UserPasswordHash,
                 Role = UserRole.User,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = baseDate
             }
         );
 
@@ -89,8 +92,8 @@ public class AppDbContext : DbContext
                 Description = "Monthly office supplies order",
                 Status = OrderStatus.Pending,
                 CreatedById = adminId,
-                CreatedAt = DateTime.UtcNow.AddDays(-5),
-                UpdatedAt = DateTime.UtcNow.AddDays(-5)
+                CreatedAt = baseDate.AddDays(-5),
+                UpdatedAt = baseDate.AddDays(-5)
             },
             new Order
             {
@@ -99,8 +102,8 @@ public class AppDbContext : DbContext
                 Description = "New laptops for development team",
                 Status = OrderStatus.Approved,
                 CreatedById = adminId,
-                CreatedAt = DateTime.UtcNow.AddDays(-10),
-                UpdatedAt = DateTime.UtcNow.AddDays(-3)
+                CreatedAt = baseDate.AddDays(-10),
+                UpdatedAt = baseDate.AddDays(-3)
             },
             new Order
             {
@@ -109,8 +112,8 @@ public class AppDbContext : DbContext
                 Description = "Books and courses for team training",
                 Status = OrderStatus.Draft,
                 CreatedById = userId,
-                CreatedAt = DateTime.UtcNow.AddDays(-2),
-                UpdatedAt = DateTime.UtcNow.AddDays(-2)
+                CreatedAt = baseDate.AddDays(-2),
+                UpdatedAt = baseDate.AddDays(-2)
             }
         );
 
