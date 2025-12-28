@@ -12,7 +12,7 @@ public class GraphQLErrorFilter : IErrorFilter
     private readonly ILogger<GraphQLErrorFilter> _logger;
     private readonly bool _isDevelopment;
 
-    public GraphQLErrorFilter(ILogger<GraphQLErrorFilter> logger, IHostEnvironment? environment = null)
+    public GraphQLErrorFilter(ILogger<GraphQLErrorFilter> logger, Microsoft.Extensions.Hosting.IHostEnvironment? environment = null)
     {
         _logger = logger;
         _isDevelopment = environment?.EnvironmentName == "Development";
@@ -68,10 +68,4 @@ public class GraphQLErrorFilter : IErrorFilter
             .WithMessage("An unexpected error occurred. Please try again later.")
             .RemoveException();
     }
-}
-
-// Minimal IHostEnvironment interface for DI (Azure Functions doesn't include this by default)
-public interface IHostEnvironment
-{
-    string EnvironmentName { get; }
 }

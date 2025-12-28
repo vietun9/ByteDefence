@@ -1,9 +1,12 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using ByteDefence.Shared.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using Polly;
 using Polly.Retry;
 
@@ -151,36 +154,35 @@ public class AzureSignalRNotificationService : INotificationService
         if (!parts.TryGetValue("AccessKey", out var accessKey))
             throw new InvalidOperationException("SignalR connection string missing AccessKey");
 
-        // Generate a simple access token (in production, use proper JWT generation)
+        // Generate access token using proper JWT library
         var token = GenerateAccessToken(endpoint, accessKey);
         
         return (endpoint, token);
     }
 
+    /// <summary>
+    /// Generates a JWT access token for Azure SignalR REST API using proper JWT libraries.
+    /// </summary>
     private string GenerateAccessToken(string endpoint, string accessKey)
     {
-        // For Azure SignalR REST API, we need to generate a JWT token
-        // This is a simplified version - in production, use proper JWT libraries
         var audience = $"{endpoint}/api/v1/hubs/{_hubName}";
-        var expiry = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
-        
-        var claims = new Dictionary<string, object>
+        var now = DateTime.UtcNow;
+        var expires = now.AddHours(1);
+
+        var securityKey = new SymmetricSecurityKey(Convert.FromBase64String(accessKey));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+        var tokenDescriptor = new SecurityTokenDescriptor
         {
-            ["aud"] = audience,
-            ["exp"] = expiry,
-            ["iat"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            Audience = audience,
+            Expires = expires,
+            IssuedAt = now,
+            NotBefore = now,
+            SigningCredentials = credentials
         };
 
-        // Use the access key to sign (simplified - use proper HMAC in production)
-        var header = Convert.ToBase64String(Encoding.UTF8.GetBytes("{\"alg\":\"HS256\",\"typ\":\"JWT\"}"))
-            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(claims)))
-            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
-        
-        using var hmac = new System.Security.Cryptography.HMACSHA256(Convert.FromBase64String(accessKey));
-        var signature = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes($"{header}.{payload}")))
-            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
-        return $"{header}.{payload}.{signature}";
+        var tokenHandler = new JwtSecurityTokenHandler();
+        var token = tokenHandler.CreateToken(tokenDescriptor);
+        return tokenHandler.WriteToken(token);
     }
 }

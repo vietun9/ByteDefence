@@ -7,8 +7,19 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure JWT authentication for SignalR
-var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!";
+// Get environment - require JWT secret in production
+var environment = builder.Environment.EnvironmentName;
+var jwtSecret = builder.Configuration["Jwt:Secret"];
+
+if (environment != "Development" && string.IsNullOrEmpty(jwtSecret))
+{
+    throw new InvalidOperationException(
+        "JWT secret must be configured via Jwt:Secret in production. " +
+        "Do not rely on default development secrets.");
+}
+
+// Use development secret only in Development environment
+jwtSecret ??= "ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "ByteDefence";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "ByteDefence-API";
 
@@ -75,8 +86,12 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map the SignalR hub with optional authentication
-// Anonymous connections allowed for demo, but authenticated users get user context
+// Map the SignalR hub
+// NOTE: Anonymous connections allowed for development/demo purposes.
+// In production, apply [Authorize] attribute to NotificationHub class
+// or use .RequireAuthorization() below to require authentication.
+// For this demo, we allow anonymous so users can see real-time updates
+// without requiring login for the SignalR connection itself.
 app.MapHub<NotificationHub>("/hubs/notifications");
 
 // API endpoint for broadcasting from the Azure Functions
