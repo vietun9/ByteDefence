@@ -135,9 +135,3 @@ docker-compose down
 1. Install C# Dev Kit extension
 2. Open the repository folder
 3. Use the provided launch configurations or run manually
-
-### JetBrains Rider
-
-1. Open `ByteDefence.sln`
-2. Configure compound run configuration for all services
-3. Run all services together
