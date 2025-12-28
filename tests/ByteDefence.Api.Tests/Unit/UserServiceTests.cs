@@ -26,12 +26,13 @@ public class UserServiceTests
 
     private void SeedData()
     {
+        // Use BCrypt hashed passwords for tests
         var adminUser = new User
         {
             Id = "admin-test",
             Username = "admin",
             Email = "admin@test.com",
-            PasswordHash = "admin123",
+            PasswordHash = UserService.HashPassword("admin123"),
             Role = UserRole.Admin
         };
 
@@ -40,7 +41,7 @@ public class UserServiceTests
             Id = "user-test",
             Username = "user",
             Email = "user@test.com",
-            PasswordHash = "user123",
+            PasswordHash = UserService.HashPassword("user123"),
             Role = UserRole.User
         };
 

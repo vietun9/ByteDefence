@@ -35,15 +35,20 @@ public class UserService : IUserService
         var user = await GetByUsernameAsync(username);
         if (user == null) return null;
 
-        // DEMO/MOCK IMPLEMENTATION: Plain text password comparison for demo purposes.
-        // In production, use proper password hashing (BCrypt, Argon2, or ASP.NET Identity).
-        // This approach is intentional for the open-book exercise as per requirements:
-        // "Mock data, mock auth, mock error is acceptable."
-        if (user.PasswordHash == password)
+        // Production-ready password verification using BCrypt
+        if (BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
         {
             return user;
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Hashes a password using BCrypt for secure storage.
+    /// </summary>
+    public static string HashPassword(string password)
+    {
+        return BCrypt.Net.BCrypt.HashPassword(password, workFactor: 12);
     }
 }

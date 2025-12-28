@@ -145,51 +145,23 @@ public class GraphQLFunction
     private async Task<HttpResponseData> HandlePlaygroundRequest(HttpRequestData req)
     {
         var response = req.CreateResponse(HttpStatusCode.OK);
-        response.Headers.Add("Content-Type", "text/html");
+        response.Headers.Add("Content-Type", "application/json");
 
-        var html = @"
-<!DOCTYPE html>
-<html>
-<head>
-    <title>ByteDefence GraphQL</title>
-    <style>
-        body { margin: 0; padding: 40px; font-family: system-ui, -apple-system, sans-serif; background: #1a1a2e; color: #fff; }
-        h1 { margin-bottom: 20px; }
-        .info { background: #16213e; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
-        code { background: #0f3460; padding: 2px 6px; border-radius: 4px; }
-        a { color: #e94560; }
-    </style>
-</head>
-<body>
-    <h1>🚀 ByteDefence GraphQL API</h1>
-    <div class='info'>
-        <p>This is the GraphQL endpoint. Use a GraphQL client like:</p>
-        <ul>
-            <li><a href='https://www.postman.com/' target='_blank'>Postman</a></li>
-            <li><a href='https://github.com/graphql/graphiql' target='_blank'>GraphiQL</a></li>
-            <li><a href='https://chillicream.com/products/bananacakepop' target='_blank'>Banana Cake Pop</a></li>
-        </ul>
-        <p>Endpoint: <code>POST /api/graphql</code></p>
-        <h3>Test Credentials</h3>
-        <table style='border-collapse: collapse;'>
-            <tr><td style='padding: 5px; border: 1px solid #333;'>Admin</td><td style='padding: 5px; border: 1px solid #333;'>admin / admin123</td></tr>
-            <tr><td style='padding: 5px; border: 1px solid #333;'>User</td><td style='padding: 5px; border: 1px solid #333;'>user / user123</td></tr>
-        </table>
-        <h3>Example Login Mutation</h3>
-        <pre style='background: #0f3460; padding: 10px; border-radius: 4px; overflow-x: auto;'>
-mutation {
-  login(input: { username: ""admin"", password: ""admin123"" }) {
-    token
-    user { id username role }
-    errorMessage
-  }
-}
-        </pre>
-    </div>
-</body>
-</html>";
+        var info = new
+        {
+            service = "ByteDefence GraphQL API",
+            version = "1.0.0",
+            endpoint = "POST /api/graphql",
+            documentation = "Use a GraphQL client (Postman, GraphiQL, Banana Cake Pop) to query this endpoint.",
+            testCredentials = new
+            {
+                admin = new { username = "admin", password = "admin123" },
+                user = new { username = "user", password = "user123" }
+            },
+            exampleQuery = "mutation { login(input: { username: \"admin\", password: \"admin123\" }) { token user { id username role } } }"
+        };
 
-        await response.WriteStringAsync(html);
+        await response.WriteAsJsonAsync(info);
         return response;
     }
 }
