@@ -7,14 +7,19 @@ var builder = WebApplication.CreateBuilder(args);
 // Add SignalR
 builder.Services.AddSignalR();
 
-// Add CORS
+// Add CORS - Note: AllowAnyOrigin is used for local development only.
+// In production, this should be restricted to specific domains via configuration.
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+    ?? new[] { "http://localhost:5001", "http://localhost:7071" };
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
