@@ -169,10 +169,10 @@ It shows:
 
 **Evaluation criteria:** type safety, DX, build-time validation, subscription support
 
-| Client          | Pros                                 | Cons                    | EM Signal   |
-| --------------- | ------------------------------------ | ----------------------- | ----------- |
-| StrawberryShake | Strong typing, code-gen, schema sync | Setup complexity        | ⭐ Rigor     |
-| GraphQL.Client  | Lightweight, flexible                | Runtime errors possible | ⭐ Pragmatic |
+| Client          | Pros                                 | Cons                    |
+| --------------- | ------------------------------------ | ----------------------- |
+| StrawberryShake | Strong typing, code-gen, schema sync | Setup complexity        |
+| GraphQL.Client  | Lightweight, flexible                | Runtime errors possible |
 
 **Recommended**
 👉 **StrawberryShake**
