@@ -113,22 +113,25 @@ public class OrderService : IOrderService
                         status
                         total
                         createdAt
+                        updatedAt
                         items {
                             id
                             name
                             quantity
                             price
+                            subtotal
                         }
                         createdBy {
                             id
                             username
+                            email
                         }
                     }
                     errorMessage
                 }
             }";
 
-        var response = await _graphQLClient.MutateAsync<CreateOrderResponse>(mutation, 
+        var response = await _graphQLClient.MutateAsync<CreateOrderResponse>(mutation,
             new { input = new { title, description } });
         return response.Data;
     }
@@ -143,20 +146,26 @@ public class OrderService : IOrderService
                         title
                         description
                         status
-                        total
+                        createdAt
                         updatedAt
                         items {
                             id
                             name
                             quantity
                             price
+                            subtotal
+                        }
+                        createdBy {
+                            id
+                            username
+                            email
                         }
                     }
                     errorMessage
                 }
             }";
 
-        var response = await _graphQLClient.MutateAsync<UpdateOrderResponse>(mutation, 
+        var response = await _graphQLClient.MutateAsync<UpdateOrderResponse>(mutation,
             new { input = new { id, title, description, status = status?.ToString().ToUpper() } });
         return response.Data;
     }
@@ -191,7 +200,7 @@ public class OrderService : IOrderService
                 }
             }";
 
-        var response = await _graphQLClient.MutateAsync<AddItemResponse>(mutation, 
+        var response = await _graphQLClient.MutateAsync<AddItemResponse>(mutation,
             new { input = new { orderId, name, quantity, price } });
         return response.Data;
     }

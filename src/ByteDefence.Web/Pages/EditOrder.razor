@@ -268,14 +268,29 @@
             var status = Enum.Parse<OrderStatus>(_model.Status);
             var response = await OrderService.UpdateOrderAsync(Id, _model.Title, _model.Description, status);
             
-            if (response?.UpdateOrder?.Order != null)
-            {
-                Navigation.NavigateTo($"/orders/{Id}");
-            }
-            else
-            {
-                _error = response?.UpdateOrder?.ErrorMessage ?? "Failed to update order";
-            }
+                if (response?.UpdateOrder?.Order != null)
+                {
+                    // Update the local state
+                    if (_order != null)
+                    {
+                        var updatedOrder = response.UpdateOrder.Order;
+                        // Preserve items if not returned/updated
+                        if (updatedOrder.Items == null || !updatedOrder.Items.Any())
+                        {
+                            updatedOrder.Items = _order.Items;
+                        }
+                        // Preserve creator info if not returned/updated
+                        if (updatedOrder.CreatedBy == null)
+                        {
+                            updatedOrder.CreatedBy = _order.CreatedBy;
+                        }
+                    }
+                    Navigation.NavigateTo($"/orders/{Id}");
+                }
+                else
+                {
+                    _error = response?.UpdateOrder?.ErrorMessage ?? "Failed to update order";
+                }
         }
         catch (Exception ex)
         {

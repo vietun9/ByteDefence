@@ -3,6 +3,8 @@
 @inject IOrderService OrderService
 @inject ISignalRService SignalR
 @inject NavigationManager Navigation
+@inject OrderState OrderState
+@inject ToastService ToastService
 @implements IDisposable
 
 <PageTitle>Order Details - ByteDefence</PageTitle>
@@ -378,6 +380,7 @@
     private bool _isUpdating;
     private string _selectedStatus = "Draft";
     private HubConnectionState _connectionState = HubConnectionState.Disconnected;
+    private Action<HubConnectionState>? _stateHandler;
 
     // New item form
     private string _newItemName = string.Empty;
@@ -387,6 +390,8 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadOrder();
+        // subscribe to local state changes
+        OrderState.OnChange += OnOrderStateChanged;
         await SetupSignalR();
     }
 
@@ -418,29 +423,74 @@
 
     private async Task SetupSignalR()
     {
-        SignalR.OnStateChanged += state =>
+        _stateHandler = state =>
         {
             _connectionState = state;
             InvokeAsync(StateHasChanged);
         };
 
-        SignalR.OnOrderUpdated += _ =>
-        {
-            _hasUpdate = true;
-            InvokeAsync(StateHasChanged);
-        };
+        SignalR.OnStateChanged += _stateHandler;
+        SignalR.OnOrderUpdated += HandleOrderUpdated;
 
         try
         {
             await SignalR.StartAsync();
             await SignalR.JoinOrderGroupAsync(Id);
             _connectionState = SignalR.State;
+            
+            // Safety net: force a reload after joining in case we missed an update
+            await LoadOrder();
         }
         catch
         {
             _connectionState = HubConnectionState.Disconnected;
         }
     }
+
+    private async void HandleOrderUpdated(object data)
+    {
+        // When an update is received, we should fetch the latest order details
+        // to ensure we have the full object graph (items, creator, etc.)
+        // relying on the broadcast payload might result in partial data if the backend didn't include everything
+        try
+        {
+            if (data is System.Text.Json.JsonElement json)
+            {
+                // We only really need the ID to refetch, but let's try to get ID from the payload
+                string? orderId = null;
+                // Try case-insensitive property access for "Id" or "id"
+                if (json.TryGetProperty("id", out var idElement) || json.TryGetProperty("Id", out idElement))
+                {
+                    orderId = idElement.GetString();
+                }
+
+                // If ID matches, reload silently and update OrderState
+                if (!string.IsNullOrEmpty(orderId) && orderId == Id)
+                {
+                   try 
+                   {
+                       var response = await OrderService.GetOrderAsync(Id);
+                       if (response?.Order != null)
+                       {
+                           // Updating OrderState will trigger OnOrderStateChanged, which updates _order and renders UI
+                           OrderState.Upsert(response.Order);
+                           ToastService.ShowInfo("Order updated");
+                       }
+                   }
+                   catch (Exception innerEx)
+                   {
+                       Console.WriteLine($"Failed to silent reload: {innerEx.Message}");
+                   }
+                }
+            }
+        }
+        catch (Exception ex)
+        { 
+            Console.WriteLine($"Error handling OrderUpdated: {ex.Message}");
+        }
+    }
+
+
 
     private void GoBack()
     {
@@ -488,7 +538,11 @@
             var response = await OrderService.UpdateOrderAsync(Id, null, null, status);
             if (response?.UpdateOrder?.Order != null)
             {
-                _order = response.UpdateOrder.Order;
+                // Immediate local update
+                var updated = response.UpdateOrder.Order;
+                OrderState.Upsert(updated);
+                _order = updated;
+                ToastService.ShowSuccess("Order updated");
             }
             else
             {
@@ -527,8 +581,18 @@
             var response = await OrderService.AddOrderItemAsync(Id, _newItemName, _newItemQuantity, _newItemPrice);
             if (response?.AddOrderItem?.Item != null)
             {
+                // Optimistically update local order state with returned item
+                var item = response.AddOrderItem.Item;
                 CancelAddItem();
-                await LoadOrder();
+                if (_order != null)
+                {
+                    _order.Items.Add(item);
+                    // recompute totals if available
+                    _order.Total = _order.Items.Sum(i => i.Subtotal);
+                    _order.UpdatedAt = DateTime.UtcNow;
+                    OrderState.Upsert(_order);
+                    ToastService.ShowSuccess("Item added");
+                }
             }
             else
             {
@@ -548,7 +612,18 @@
             var response = await OrderService.RemoveOrderItemAsync(itemId);
             if (response?.RemoveOrderItem?.Success == true)
             {
-                await LoadOrder();
+                if (_order != null)
+                {
+                    var idx = _order.Items.FindIndex(i => i.Id == itemId);
+                    if (idx >= 0)
+                    {
+                        _order.Items.RemoveAt(idx);
+                        _order.Total = _order.Items.Sum(i => i.Subtotal);
+                        _order.UpdatedAt = DateTime.UtcNow;
+                        OrderState.Upsert(_order);
+                        ToastService.ShowInfo("Item removed");
+                    }
+                }
             }
             else
             {
@@ -573,6 +648,23 @@
 
     public void Dispose()
     {
+        // leave SignalR group and unsubscribe handlers
         SignalR.LeaveOrderGroupAsync(Id).ConfigureAwait(false);
+        SignalR.LeaveOrderGroupAsync(Id).ConfigureAwait(false);
+        if (_stateHandler != null)
+            SignalR.OnStateChanged -= _stateHandler;
+        SignalR.OnOrderUpdated -= HandleOrderUpdated;
+        OrderState.OnChange -= OnOrderStateChanged;
+    }
+
+    private void OnOrderStateChanged()
+    {
+        // if state changed for this order, pick it up
+        var updated = OrderState.Get(Id);
+        if (updated != null)
+        {
+            _order = updated;
+            InvokeAsync(StateHasChanged);
+        }
     }
 }

@@ -3,6 +3,9 @@
 @inject IOrderService OrderService
 @inject ISignalRService SignalR
 @inject NavigationManager Navigation
+@inject OrderState OrderState
+@inject ToastService ToastService
+@inject ILogger<Orders> Logger
 @implements IDisposable
 
 <PageTitle>Orders - ByteDefence</PageTitle>
@@ -252,6 +255,7 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadOrders();
+        OrderState.OnChange += OnOrderStateChanged;
         await SetupSignalR();
     }
 
@@ -266,6 +270,11 @@
         {
             var response = await OrderService.GetOrdersAsync();
             _orders = response?.Orders ?? new List<OrderDto>();
+            // seed local state
+            foreach (var o in _orders)
+            {
+                OrderState.Upsert(o);
+            }
         }
         catch (Exception ex)
         {
@@ -279,29 +288,10 @@
 
     private async Task SetupSignalR()
     {
-        SignalR.OnStateChanged += state =>
-        {
-            _connectionState = state;
-            InvokeAsync(StateHasChanged);
-        };
-
-        SignalR.OnOrderCreated += _ =>
-        {
-            _hasUpdate = true;
-            InvokeAsync(StateHasChanged);
-        };
-
-        SignalR.OnOrderUpdated += _ =>
-        {
-            _hasUpdate = true;
-            InvokeAsync(StateHasChanged);
-        };
-
-        SignalR.OnOrderDeleted += _ =>
-        {
-            _hasUpdate = true;
-            InvokeAsync(StateHasChanged);
-        };
+        SignalR.OnStateChanged += HandleStateChanged;
+        SignalR.OnOrderCreated += HandleOrderCreated;
+        SignalR.OnOrderUpdated += HandleOrderUpdated;
+        SignalR.OnOrderDeleted += HandleOrderDeleted;
 
         try
         {
@@ -309,10 +299,63 @@
             await SignalR.JoinAllOrdersGroupAsync();
             _connectionState = SignalR.State;
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to connect to SignalR");
             _connectionState = HubConnectionState.Disconnected;
         }
+    }
+
+    private void HandleStateChanged(HubConnectionState state)
+    {
+        _connectionState = state;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleOrderCreated(object data)
+    {
+        try
+        {
+            if (data is System.Text.Json.JsonElement json)
+            {
+                var order = System.Text.Json.JsonSerializer.Deserialize<OrderDto>(json.GetRawText(), new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (order != null)
+                {
+                    OrderState.Upsert(order);
+                    ToastService.ShowInfo($"Order {order.Title} created");
+                }
+            }
+        }
+        catch (Exception ex) 
+        {
+            Logger.LogError(ex, "Error handling OrderCreated");
+        }
+    }
+
+    private void HandleOrderUpdated(object data)
+    {
+        try
+        {
+            if (data is System.Text.Json.JsonElement json)
+            {
+                var order = System.Text.Json.JsonSerializer.Deserialize<OrderDto>(json.GetRawText(), new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (order != null)
+                {
+                    OrderState.Upsert(order);
+                    ToastService.ShowInfo($"Order {order.Title} updated");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error handling OrderUpdated");
+        }
+    }
+
+    private void HandleOrderDeleted(string orderId)
+    {
+        OrderState.Remove(orderId);
+        ToastService.ShowInfo($"Order {orderId} deleted");
     }
 
     private void NavigateToCreate()
@@ -338,5 +381,16 @@
     public void Dispose()
     {
         SignalR.LeaveAllOrdersGroupAsync().ConfigureAwait(false);
+        SignalR.OnStateChanged -= HandleStateChanged;
+        SignalR.OnOrderCreated -= HandleOrderCreated;
+        SignalR.OnOrderUpdated -= HandleOrderUpdated;
+        SignalR.OnOrderDeleted -= HandleOrderDeleted;
+        OrderState.OnChange -= OnOrderStateChanged;
+    }
+
+    private void OnOrderStateChanged()
+    {
+        _orders = OrderState.GetAll().ToList();
+        InvokeAsync(StateHasChanged);
     }
 }

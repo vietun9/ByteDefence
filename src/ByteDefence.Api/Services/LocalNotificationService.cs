@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace ByteDefence.Api.Services;
 
@@ -18,6 +20,7 @@ public class LocalNotificationService : INotificationService
     private readonly ILogger<LocalNotificationService> _logger;
     private readonly string _hubUrl;
     private readonly AsyncRetryPolicy _retryPolicy;
+    private readonly JsonSerializerOptions _jsonOptions;
 
     public LocalNotificationService(IConfiguration config, ILogger<LocalNotificationService> logger)
     {
@@ -44,6 +47,12 @@ public class LocalNotificationService : INotificationService
                         retryCount,
                         timeSpan.TotalSeconds);
                 });
+
+        _jsonOptions = new JsonSerializerOptions
+        {
+            ReferenceHandler = ReferenceHandler.IgnoreCycles,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
     }
 
     public async Task BroadcastOrderUpdated(Order order)
@@ -68,7 +77,7 @@ public class LocalNotificationService : INotificationService
             await _retryPolicy.ExecuteAsync(async () =>
             {
                 var message = new SignalRMessage(method, group, data);
-                var response = await _httpClient.PostAsJsonAsync("/api/broadcast", message);
+                var response = await _httpClient.PostAsJsonAsync("/api/broadcast", message, _jsonOptions);
                 response.EnsureSuccessStatusCode();
                 _logger.LogInformation("Broadcasted {Method} to {Group}", method, group ?? "all");
             });

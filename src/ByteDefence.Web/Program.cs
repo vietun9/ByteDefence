@@ -30,4 +30,8 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 // Add SignalR service
 builder.Services.AddSingleton<ISignalRService, SignalRService>();
 
+// Add local order state and toast service
+builder.Services.AddSingleton<OrderState>();
+builder.Services.AddSingleton<ToastService>();
+
 await builder.Build().RunAsync();
