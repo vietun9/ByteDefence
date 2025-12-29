@@ -33,7 +33,7 @@ public class GraphQLFunction
         
         // Load allowed origins from configuration (default to localhost for dev)
         _allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
-            ?? new[] { "http://localhost:5001", "http://localhost:5173", "https://localhost:5001" };
+            ?? ["http://localhost:8080", "http://localhost:5001"];
     }
 
     [Function("graphql")]
