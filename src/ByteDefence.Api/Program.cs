@@ -12,8 +12,13 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using ByteDefence.Api.Middleware;
+
 var host = new HostBuilder()
-    .ConfigureFunctionsWorkerDefaults()
+    .ConfigureFunctionsWorkerDefaults(worker =>
+    {
+        worker.UseMiddleware<CorsMiddleware>();
+    })
     .ConfigureServices((context, services) =>
     {
         var configuration = context.Configuration;
@@ -21,7 +26,7 @@ var host = new HostBuilder()
         // Validate JWT secret is configured for non-development environments
         var jwtSecret = configuration["Jwt:Secret"];
         var environment = configuration["AZURE_FUNCTIONS_ENVIRONMENT"] ?? "Development";
-        if (environment != "Development" && 
+        if (environment != "Development" &&
             (string.IsNullOrEmpty(jwtSecret) || jwtSecret.Contains("Development")))
         {
             throw new InvalidOperationException(
@@ -33,10 +38,10 @@ var host = new HostBuilder()
         var useCosmosDb = configuration.GetValue<bool>("UseCosmosDb");
         if (useCosmosDb)
         {
-            var connectionString = configuration.GetConnectionString("CosmosDb") 
+            var connectionString = configuration.GetConnectionString("CosmosDb")
                 ?? configuration["CosmosDb:ConnectionString"];
             var databaseName = configuration["CosmosDb:DatabaseName"] ?? "ByteDefence";
-            
+
             services.AddDbContextFactory<AppDbContext>(options =>
                 options.UseCosmos(connectionString!, databaseName));
             services.AddDbContext<AppDbContext>(options =>
@@ -54,7 +59,7 @@ var host = new HostBuilder()
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<IUserService, UserService>();
         services.AddSingleton<IAuthService, AuthService>();
-        
+
         // Register notification service based on configuration
         var signalRMode = configuration["SignalR:Mode"] ?? "Local";
         if (signalRMode.Equals("Azure", StringComparison.OrdinalIgnoreCase))

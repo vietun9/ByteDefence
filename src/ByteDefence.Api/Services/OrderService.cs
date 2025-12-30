@@ -4,16 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ByteDefence.Api.Services;
 
-public class OrderService : IOrderService
+public class OrderService(AppDbContext context, INotificationService notificationService) : IOrderService
 {
-    private readonly AppDbContext _context;
-    private readonly INotificationService _notificationService;
-
-    public OrderService(AppDbContext context, INotificationService notificationService)
-    {
-        _context = context;
-        _notificationService = notificationService;
-    }
+    private readonly AppDbContext _context = context;
+    private readonly INotificationService _notificationService = notificationService;
 
     public Task<IQueryable<Order>> GetAllAsync()
     {
@@ -92,11 +86,7 @@ public class OrderService : IOrderService
     {
         var order = await _context.Orders
             .Include(o => o.Items)
-            .FirstOrDefaultAsync(o => o.Id == orderId);
-
-        if (order == null)
-            throw new InvalidOperationException($"Order {orderId} not found");
-
+            .FirstOrDefaultAsync(o => o.Id == orderId) ?? throw new InvalidOperationException($"Order {orderId} not found");
         var item = new OrderItem
         {
             OrderId = orderId,

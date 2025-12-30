@@ -57,12 +57,12 @@ public class LocalNotificationService : INotificationService
 
     public async Task BroadcastOrderUpdated(Order order)
     {
-        await BroadcastAsync("OrderUpdated", $"order-{order.Id}", order);
+        await BroadcastAsync("OrderUpdated", $"order-{order.Id}", order.ToNotificationDto());
     }
 
     public async Task BroadcastOrderCreated(Order order)
     {
-        await BroadcastAsync("OrderCreated", null, order);
+        await BroadcastAsync("OrderCreated", null, order.ToNotificationDto());
     }
 
     public async Task BroadcastOrderDeleted(string orderId)
@@ -85,8 +85,8 @@ public class LocalNotificationService : INotificationService
         catch (Exception ex)
         {
             // Log but don't throw - notifications are best-effort
-            _logger.LogWarning(ex, 
-                "Failed to broadcast {Method} after retries. SignalR hub may not be running at {HubUrl}.", 
+            _logger.LogWarning(ex,
+                "Failed to broadcast {Method} after retries. SignalR hub may not be running at {HubUrl}.",
                 method, _hubUrl);
         }
     }

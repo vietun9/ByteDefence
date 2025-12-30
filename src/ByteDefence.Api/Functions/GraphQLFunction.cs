@@ -13,28 +13,20 @@ using Microsoft.Extensions.Configuration;
 
 namespace ByteDefence.Api.Functions;
 
-public class GraphQLFunction
+public class GraphQLFunction(
+    IRequestExecutorResolver executorResolver,
+    ILogger<GraphQLFunction> logger,
+    IConfiguration configuration)
 {
-    private readonly IRequestExecutorResolver _executorResolver;
-    private readonly ILogger<GraphQLFunction> _logger;
-    private readonly IConfiguration _configuration;
-    private readonly JsonResultFormatter _resultFormatter;
-    private readonly string[] _allowedOrigins;
+    private readonly IRequestExecutorResolver _executorResolver = executorResolver;
+    private readonly ILogger<GraphQLFunction> _logger = logger;
+    private readonly IConfiguration _configuration = configuration;
+    private readonly JsonResultFormatter _resultFormatter = new();
 
-    public GraphQLFunction(
-        IRequestExecutorResolver executorResolver,
-        ILogger<GraphQLFunction> logger,
-        IConfiguration configuration)
+    private static readonly JsonSerializerOptions _jsonOptions = new()
     {
-        _executorResolver = executorResolver;
-        _logger = logger;
-        _configuration = configuration;
-        _resultFormatter = new JsonResultFormatter();
-        
-        // Load allowed origins from configuration (default to localhost for dev)
-        _allowedOrigins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
-            ?? ["http://localhost:8080", "http://localhost:5001"];
-    }
+        PropertyNameCaseInsensitive = true
+    };
 
     [Function("graphql")]
     public async Task<HttpResponseData> Run(
@@ -42,40 +34,25 @@ public class GraphQLFunction
     {
         _logger.LogInformation("GraphQL request received");
 
-        // Get the request origin for CORS
-        var origin = GetRequestOrigin(req);
-
-        // Short-circuit CORS preflight
-        if (req.Method.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
-        {
-            var preflight = req.CreateResponse(HttpStatusCode.OK);
-            AddCorsHeaders(preflight, origin);
-            return preflight;
-        }
-
         // Handle GET requests for GraphQL Playground/Banana Cake Pop
         if (req.Method.Equals("GET", StringComparison.OrdinalIgnoreCase))
         {
-            return await HandlePlaygroundRequest(req, origin);
+            return await HandlePlaygroundRequest(req);
         }
 
         // Parse the GraphQL request
         var body = await new StreamReader(req.Body).ReadToEndAsync();
-        var request = JsonSerializer.Deserialize<GraphQLRequest>(body, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
+        var request = JsonSerializer.Deserialize<GraphQLRequest>(body, _jsonOptions);
 
         if (request == null || string.IsNullOrEmpty(request.Query))
         {
             var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-            AddCorsHeaders(badResponse, origin);
             await badResponse.WriteAsJsonAsync(new { errors = new[] { new { message = "Invalid GraphQL request" } } });
             return badResponse;
         }
 
         // Extract and validate JWT token if present
-        var userId = ExtractUserIdFromToken(req);
+        var (userId, userRole) = ExtractUserFromToken(req);
 
         // Get the executor
         var executor = await _executorResolver.GetRequestExecutorAsync();
@@ -91,14 +68,17 @@ public class GraphQLFunction
 
         if (request.Variables != null)
         {
-            var normalized = NormalizeVariables(request.Variables);
-            requestBuilder.SetVariableValues(normalized);
+            requestBuilder.SetVariableValues(NormalizeVariables(request.Variables));
         }
 
         // Set user context for authorization
         if (!string.IsNullOrEmpty(userId))
         {
             requestBuilder.SetGlobalState("CurrentUser", userId);
+            if (!string.IsNullOrEmpty(userRole))
+            {
+                requestBuilder.SetGlobalState("CurrentRole", userRole);
+            }
         }
 
         // Execute the request
@@ -107,7 +87,6 @@ public class GraphQLFunction
         // Create the response
         var response = req.CreateResponse(HttpStatusCode.OK);
         response.Headers.Add("Content-Type", "application/json");
-        AddCorsHeaders(response, origin);
 
         // Serialize the result
         await using var stream = new MemoryStream();
@@ -115,29 +94,20 @@ public class GraphQLFunction
         stream.Position = 0;
         using var reader = new StreamReader(stream);
         var jsonResult = await reader.ReadToEndAsync();
-        
+
         await response.WriteStringAsync(jsonResult);
 
         return response;
     }
 
-    private string? GetRequestOrigin(HttpRequestData req)
-    {
-        if (req.Headers.TryGetValues("Origin", out var origins))
-        {
-            return origins.FirstOrDefault();
-        }
-        return null;
-    }
-
-    private string? ExtractUserIdFromToken(HttpRequestData req)
+    private (string? userId, string? role) ExtractUserFromToken(HttpRequestData req)
     {
         if (!req.Headers.TryGetValues("Authorization", out var authHeaders))
-            return null;
+            return (null, null);
 
         var authHeader = authHeaders.FirstOrDefault();
         if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-            return null;
+            return (null, null);
 
         var token = authHeader["Bearer ".Length..].Trim();
 
@@ -160,21 +130,23 @@ public class GraphQLFunction
             };
 
             var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
-            return principal.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+            var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
                 ?? principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+            var role = principal.FindFirst(ClaimTypes.Role)?.Value;
+
+            return (userId, role);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Token validation failed");
-            return null;
+            return (null, null);
         }
     }
 
-    private async Task<HttpResponseData> HandlePlaygroundRequest(HttpRequestData req, string? origin)
+    private static async Task<HttpResponseData> HandlePlaygroundRequest(HttpRequestData req)
     {
         var response = req.CreateResponse(HttpStatusCode.OK);
         response.Headers.Add("Content-Type", "application/json");
-        AddCorsHeaders(response, origin);
 
         var info = new
         {
@@ -194,26 +166,7 @@ public class GraphQLFunction
         return response;
     }
 
-    private void AddCorsHeaders(HttpResponseData response, string? requestOrigin)
-    {
-        // Use specific origin if it's in the allowed list, otherwise use first allowed origin
-        string corsOrigin;
-        if (!string.IsNullOrEmpty(requestOrigin) && _allowedOrigins.Contains(requestOrigin, StringComparer.OrdinalIgnoreCase))
-        {
-            corsOrigin = requestOrigin;
-        }
-        else
-        {
-            corsOrigin = _allowedOrigins.FirstOrDefault() ?? "http://localhost:5001";
-        }
-
-        response.Headers.Add("Access-Control-Allow-Origin", corsOrigin);
-        response.Headers.Add("Access-Control-Allow-Headers", "Content-Type,Authorization");
-        response.Headers.Add("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-        response.Headers.Add("Access-Control-Allow-Credentials", "true");
-    }
-
-    private static IReadOnlyDictionary<string, object?> NormalizeVariables(Dictionary<string, object?> variables)
+    private static Dictionary<string, object?> NormalizeVariables(Dictionary<string, object?> variables)
     {
         var result = new Dictionary<string, object?>(StringComparer.Ordinal);
         foreach (var kvp in variables)
@@ -225,13 +178,9 @@ public class GraphQLFunction
 
     private static object? ConvertValue(object? value)
     {
-        if (value is null)
-            return null;
+        if (value is null) return null;
 
-        if (value is JsonElement je)
-        {
-            return ConvertJsonElement(je);
-        }
+        if (value is JsonElement je) return ConvertJsonElement(je);
 
         if (value is Dictionary<string, object?> dict)
         {
@@ -255,38 +204,33 @@ public class GraphQLFunction
     {
         switch (je.ValueKind)
         {
-            case JsonValueKind.Null:
-                return null;
-            case JsonValueKind.String:
-                return je.GetString();
-            case JsonValueKind.True:
-                return true;
-            case JsonValueKind.False:
-                return false;
+            case JsonValueKind.Null: return null;
+            case JsonValueKind.String: return je.GetString();
+            case JsonValueKind.True: return true;
+            case JsonValueKind.False: return false;
             case JsonValueKind.Number:
                 if (je.TryGetInt64(out var l)) return l;
                 if (je.TryGetDecimal(out var d)) return d;
                 return je.GetDouble();
             case JsonValueKind.Object:
-            {
-                var obj = new Dictionary<string, object?>(StringComparer.Ordinal);
-                foreach (var prop in je.EnumerateObject())
                 {
-                    obj[prop.Name] = ConvertJsonElement(prop.Value);
+                    var obj = new Dictionary<string, object?>(StringComparer.Ordinal);
+                    foreach (var prop in je.EnumerateObject())
+                    {
+                        obj[prop.Name] = ConvertJsonElement(prop.Value);
+                    }
+                    return obj;
                 }
-                return obj;
-            }
             case JsonValueKind.Array:
-            {
-                var list = new List<object?>();
-                foreach (var item in je.EnumerateArray())
                 {
-                    list.Add(ConvertJsonElement(item));
+                    var list = new List<object?>();
+                    foreach (var item in je.EnumerateArray())
+                    {
+                        list.Add(ConvertJsonElement(item));
+                    }
+                    return list;
                 }
-                return list;
-            }
-            default:
-                return je.ToString();
+            default: return je.ToString();
         }
     }
 }

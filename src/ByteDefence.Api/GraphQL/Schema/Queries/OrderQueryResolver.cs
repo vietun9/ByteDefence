@@ -17,14 +17,13 @@ public class OrderQueryResolver
         [Service] IOrderService orderService,
         [GlobalState("CurrentUser")] string? userId)
     {
-        // Check if user is authenticated
         if (string.IsNullOrEmpty(userId))
         {
             throw new UnauthorizedAccessException("Authentication required");
         }
 
-        var ordersQuery = await orderService.GetAllAsync();
-        return await ordersQuery.ToListAsync();
+        var query = await orderService.GetAllAsync();
+        return await query.ToListAsync();
     }
 
     /// <summary>
@@ -61,7 +60,7 @@ public class OrderQueryResolver
     /// Returns orders and users count in parallel.
     /// </summary>
     public async Task<OrderStats> GetOrderStats(
-        [Service] IDbContextFactory<AppDbContext> contextFactory,
+        [Service] AppDbContext context,
         [GlobalState("CurrentUser")] string? userId)
     {
         if (string.IsNullOrEmpty(userId))
@@ -69,39 +68,12 @@ public class OrderQueryResolver
             throw new UnauthorizedAccessException("Authentication required");
         }
 
-        // Execute concurrent queries with separate DbContext instances (thread-safe)
-        var ordersCountTask = Task.Run(async () =>
-        {
-            await using var ctx = await contextFactory.CreateDbContextAsync();
-            return await ctx.Orders.CountAsync();
-        });
-
-        var usersCountTask = Task.Run(async () =>
-        {
-            await using var ctx = await contextFactory.CreateDbContextAsync();
-            return await ctx.Users.CountAsync();
-        });
-
-        var pendingOrdersTask = Task.Run(async () =>
-        {
-            await using var ctx = await contextFactory.CreateDbContextAsync();
-            return await ctx.Orders.CountAsync(o => o.Status == OrderStatus.Pending);
-        });
-
-        var totalValueTask = Task.Run(async () =>
-        {
-            await using var ctx = await contextFactory.CreateDbContextAsync();
-            return await ctx.OrderItems.SumAsync(i => i.Price * i.Quantity);
-        });
-
-        await Task.WhenAll(ordersCountTask, usersCountTask, pendingOrdersTask, totalValueTask);
-
         return new OrderStats
         {
-            TotalOrders = await ordersCountTask,
-            TotalUsers = await usersCountTask,
-            PendingOrders = await pendingOrdersTask,
-            TotalValue = await totalValueTask
+            TotalOrders = await context.Orders.CountAsync(),
+            TotalUsers = await context.Users.CountAsync(),
+            PendingOrders = await context.Orders.CountAsync(o => o.Status == OrderStatus.Pending),
+            TotalValue = await context.OrderItems.SumAsync(i => i.Price * i.Quantity)
         };
     }
 }

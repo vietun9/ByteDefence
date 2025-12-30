@@ -1,6 +1,5 @@
 using ByteDefence.Api.Services;
 using ByteDefence.Shared.DTOs;
-using ByteDefence.Shared.Models;
 
 namespace ByteDefence.Api.GraphQL.Schema.Mutations;
 

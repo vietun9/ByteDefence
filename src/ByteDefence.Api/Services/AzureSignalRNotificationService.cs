@@ -1,8 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
-using System.Net.Http.Json;
-using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using ByteDefence.Shared.DTOs;
 using ByteDefence.Shared.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -29,10 +28,10 @@ public class AzureSignalRNotificationService : INotificationService
         ILogger<AzureSignalRNotificationService> logger)
     {
         _logger = logger;
-        _connectionString = config["SignalR:ConnectionString"] 
+        _connectionString = config["SignalR:ConnectionString"]
             ?? throw new InvalidOperationException("SignalR:ConnectionString is required for Azure SignalR mode");
         _hubName = config["SignalR:HubName"] ?? "notifications";
-        
+
         _httpClient = new HttpClient();
 
         // Configure retry policy with exponential backoff
@@ -54,13 +53,14 @@ public class AzureSignalRNotificationService : INotificationService
 
     public async Task BroadcastOrderUpdated(Order order)
     {
-        await BroadcastToGroupAsync($"order-{order.Id}", "OrderUpdated", order);
-        await BroadcastToAllAsync("OrderUpdated", order);
+        var dto = order.ToNotificationDto();
+        await BroadcastToGroupAsync($"order-{order.Id}", "OrderUpdated", dto);
+        await BroadcastToAllAsync("OrderUpdated", dto);
     }
 
     public async Task BroadcastOrderCreated(Order order)
     {
-        await BroadcastToAllAsync("OrderCreated", order);
+        await BroadcastToAllAsync("OrderCreated", order.ToNotificationDto());
     }
 
     public async Task BroadcastOrderDeleted(string orderId)
@@ -150,13 +150,13 @@ public class AzureSignalRNotificationService : INotificationService
 
         if (!parts.TryGetValue("Endpoint", out var endpoint))
             throw new InvalidOperationException("SignalR connection string missing Endpoint");
-        
+
         if (!parts.TryGetValue("AccessKey", out var accessKey))
             throw new InvalidOperationException("SignalR connection string missing AccessKey");
 
         // Generate access token using proper JWT library
         var token = GenerateAccessToken(endpoint, accessKey);
-        
+
         return (endpoint, token);
     }
 
