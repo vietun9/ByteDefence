@@ -61,8 +61,9 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
   location: location
   kind: 'functionapp'
   properties: {
-    serverFarmId: hostingPlan.id
-    httpsOnly: true
+    identity: {
+      type: 'SystemAssigned'
+    }
     siteConfig: {
       netFrameworkVersion: 'v8.0'
       cors: {
@@ -91,7 +92,7 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'CosmosDb__ConnectionString'
-          value: cosmosConnectionString
+          value: '@Microsoft.KeyVault(SecretUri=${cosmosConnectionString})'
         }
         {
           name: 'CosmosDb__DatabaseName'
@@ -103,11 +104,11 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         }
         {
           name: 'SignalR__ConnectionString'
-          value: signalRConnectionString
+          value: '@Microsoft.KeyVault(SecretUri=${signalRConnectionString})'
         }
         {
           name: 'Jwt__Secret'
-          value: jwtSecret
+          value: '@Microsoft.KeyVault(SecretUri=${jwtSecret})'
         }
         {
           name: 'Jwt__Issuer'
@@ -124,3 +125,4 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
 
 output url string = 'https://${functionApp.properties.defaultHostName}'
 output name string = functionApp.name
+output principalId string = functionApp.identity.principalId

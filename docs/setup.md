@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-1. **.NET 8 SDK** - [Download](https://dotnet.microsoft.com/download/dotnet/8.0)
-2. **Azure Functions Core Tools v4** - [Install Guide](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local)
-3. **Docker Desktop** (optional) - [Download](https://www.docker.com/products/docker-desktop)
+1. **.NET 8 SDK**
+2. **Azure Functions Core Tools v4**
+3. **Docker Desktop** (optional)
 4. **IDE** - Visual Studio 2022, VS Code, or JetBrains Rider
 
 ## Quick Setup
@@ -89,49 +89,29 @@ The web app will be available at `http://localhost:5001` (or the port shown)
 ## Docker Setup
 
 ### Build and Run with Docker Compose
-
 ```bash
 docker-compose up --build
 ```
 
 ### Stop Services
-
 ```bash
 docker-compose down
 ```
 
+## Cloud Deployment
+
+To deploy this application to Azure (including Key Vault, SignalR Service, and Functions), please refer to the **[Deployment Guide](../infra/deployment.md)**.
+
 ## Troubleshooting
 
-### Azure Functions won't start
+- **Azure Functions won't start?** Verify `local.settings.json` exists in `src/ByteDefence.Api/`.
+- **SignalR failing?** Ensure the hub is running cleanly on port 5000 in a separate terminal.
+- **Auth errors?** Tokens expire after 8 hours. Re-login via the UI or Mutation to get a fresh token.
 
-1. Ensure Azure Functions Core Tools v4 is installed:
-   ```bash
-   func --version
-   ```
-2. Check that the local.settings.json file exists in the Api project
+## Environment Variables
 
-### SignalR connection fails
+| Service | File | Key Variables |
+|---------|------|---------------|
+| **API** | `local.settings.json` | `Jwt__Secret`, `SignalR__HubUrl`, `UseCosmosDb` |
+| **Web** | `wwwroot/appsettings.json` | `Api:Url`, `SignalR:HubUrl` |
 
-1. Verify the SignalR hub is running on port 5000
-2. Check CORS settings in the SignalR project
-3. Ensure the web app has the correct SignalR hub URL
-
-### GraphQL returns authentication errors
-
-1. Login first to get a JWT token
-2. Ensure the Authorization header is set: `Bearer <token>`
-3. Check that the token hasn't expired (8-hour validity)
-
-## IDE Setup
-
-### Visual Studio 2022
-
-1. Open `ByteDefence.sln`
-2. Set multiple startup projects: Api, SignalR, Web
-3. Press F5 to start debugging
-
-### VS Code
-
-1. Install C# Dev Kit extension
-2. Open the repository folder
-3. Use the provided launch configurations or run manually

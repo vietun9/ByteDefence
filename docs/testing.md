@@ -1,44 +1,38 @@
 # Testing Guide
 
-## GraphQL API Testing
+# Testing Guide
 
-### Using Postman
+## Test Credentials
 
-1. Create a new request with method `POST`
-2. URL: `http://localhost:7071/api/graphql`
-3. Headers:
-   - `Content-Type: application/json`
-   - `Authorization: Bearer <token>` (for authenticated requests)
-4. Body (raw JSON):
-   ```json
-   {
-     "query": "mutation { login(input: { username: \"admin\", password: \"admin123\" }) { token user { id username } } }"
-   }
-   ```
+| Role | Username | Password | Notes |
+|------|----------|----------|-------|
+| **Admin** | `admin` | `admin123` | Can delete orders |
+| **User** | `user` | `user123` | Standard access |
 
-### Using Banana Cake Pop
+## Tools
 
-1. Download from [Banana Cake Pop](https://chillicream.com/products/bananacakepop)
-2. Connect to `http://localhost:7071/api/graphql`
-3. Use the built-in explorer to browse the schema
-4. Add authentication header after logging in
+*   **Banana Cake Pop (Recommended)**: Interact with `http://localhost:7071/api/graphql`.
+*   **Postman**: Send standard POST requests to the same endpoint.
 
-### Using curl
+## Quick Snippets
 
 **Login:**
-```bash
-curl -X POST http://localhost:7071/api/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query": "mutation { login(input: { username: \"admin\", password: \"admin123\" }) { token user { id username } errorMessage } }"}'
+```graphql
+mutation {
+  login(input: { username: "admin", password: "admin123" }) {
+    token
+    user { id username }
+  }
+}
 ```
 
-**Get Orders (with token):**
-```bash
-curl -X POST http://localhost:7071/api/graphql \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <your-token>" \
-  -d '{"query": "query { orders { id title status total } }"}'
+**Get List:**
+```graphql
+query {
+  orders { id title status total }
+}
 ```
+
 
 ## Test Scenarios
 
