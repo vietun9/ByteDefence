@@ -370,7 +370,7 @@ services:
   web:
     build:  ./src/ByteDefence.Web
     ports:
-      - "5001:80"
+      - "5000:80"
     environment:
       - SignalR__HubUrl=http://localhost:5000/hubs/notifications
       - Api__Url=http://localhost:7071/api/graphql

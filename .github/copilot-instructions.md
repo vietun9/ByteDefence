@@ -1,6 +1,6 @@
 # AI Coding Agent Instructions
 
-- Scope: Build the open-book exercise defined in [project-base-requirements.md](../project-base-requirements.md): Azure-hosted (or fully local) GraphQL API in C# 10+ plus a Blazor frontend (WASM or Server) consuming it.
+- Scope: Build the open-book exercise defined in [project-base-requirements.md](../docs/project-base-requirements.md): Azure-hosted (or fully local) GraphQL API in C# 10+ plus a Blazor frontend (WASM or Server) consuming it.
 - Track AI usage: record a brief summary of prompts/conversations used while coding.
 
 ## Architecture & Tech Choices
@@ -29,4 +29,4 @@
 ## Work Style for Agents
 - Prefer clear, minimal code with brief comments only where logic is non-obvious; keep to ASCII unless existing files require otherwise.
 - Do not remove user changes; avoid destructive git commands.
-- When unsure about requirements, consult [project-base-requirements.md](../project-base-requirements.md) and ask the user before deviating.
+- When unsure about requirements, consult [project-base-requirements.md](../docs/project-base-requirements.md) and ask the user before deviating.

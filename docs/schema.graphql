@@ -1,0 +1,245 @@
+# ByteDefence GraphQL Schema
+# Order Management System with Real-time Updates
+
+# Root Query Type
+type Query {
+  """Get all orders with optional filtering and sorting. Requires authentication."""
+  orders(first: Int, after: String, where: OrderFilterInput, order: [OrderSortInput!]): [Order!]!
+  
+  """Get a single order by ID. Requires authentication."""
+  order(id: String!): Order
+  
+  """Get the currently authenticated user. Requires authentication."""
+  me: User
+  
+  """Get order statistics (concurrent query demonstration). Requires authentication."""
+  orderStats: OrderStats!
+}
+
+# Root Mutation Type
+type Mutation {
+  """Authenticate and receive a JWT token."""
+  login(input: LoginInput!): LoginPayload!
+  
+  """Create a new order. Requires authentication."""
+  createOrder(input: CreateOrderInput!): CreateOrderPayload!
+  
+  """Update an existing order. Requires authentication."""
+  updateOrder(input: UpdateOrderInput!): UpdateOrderPayload!
+  
+  """Delete an order. Requires Admin role."""
+  deleteOrder(id: String!): DeleteOrderPayload!
+  
+  """Add an item to an order. Requires authentication."""
+  addOrderItem(input: AddOrderItemInput!): AddOrderItemPayload!
+  
+  """Remove an item from an order. Requires authentication."""
+  removeOrderItem(itemId: String!): RemoveOrderItemPayload!
+}
+
+# Order Type
+type Order {
+  """Unique identifier of the order."""
+  id: ID!
+  
+  """Title of the order."""
+  title: String!
+  
+  """Detailed description of the order."""
+  description: String
+  
+  """Current status of the order."""
+  status: OrderStatus!
+  
+  """Line items in this order."""
+  items: [OrderItem!]!
+  
+  """Total value of the order (calculated from items)."""
+  total: Decimal!
+  
+  """The user who created this order."""
+  createdBy: User
+  
+  """When the order was created."""
+  createdAt: DateTime!
+  
+  """When the order was last updated."""
+  updatedAt: DateTime!
+}
+
+# Order Item Type
+type OrderItem {
+  """Unique identifier of the item."""
+  id: ID!
+  
+  """Name of the item."""
+  name: String!
+  
+  """Quantity ordered."""
+  quantity: Int!
+  
+  """Price per unit."""
+  price: Decimal!
+  
+  """Subtotal for this line item (price × quantity)."""
+  subtotal: Decimal!
+}
+
+# User Type
+type User {
+  """Unique identifier of the user."""
+  id: ID!
+  
+  """Username."""
+  username: String!
+  
+  """Email address."""
+  email: String!
+  
+  """User's role in the system."""
+  role: UserRole!
+  
+  """When the user account was created."""
+  createdAt: DateTime!
+}
+
+# Order Statistics Type
+type OrderStats {
+  """Total number of orders in the system."""
+  totalOrders: Int!
+  
+  """Total number of users in the system."""
+  totalUsers: Int!
+  
+  """Number of orders with pending status."""
+  pendingOrders: Int!
+  
+  """Total value of all order items."""
+  totalValue: Decimal!
+}
+
+# Order Status Enum
+enum OrderStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  COMPLETED
+  CANCELLED
+}
+
+# User Role Enum
+enum UserRole {
+  USER
+  ADMIN
+}
+
+# Input Types
+input LoginInput {
+  username: String!
+  password: String!
+}
+
+input CreateOrderInput {
+  title: String!
+  description: String!
+}
+
+input UpdateOrderInput {
+  id: String!
+  title: String
+  description: String
+  status: OrderStatus
+}
+
+input AddOrderItemInput {
+  orderId: String!
+  name: String!
+  quantity: Int!
+  price: Decimal!
+}
+
+input OrderFilterInput {
+  title: StringOperationFilterInput
+  status: OrderStatusOperationFilterInput
+}
+
+input OrderSortInput {
+  createdAt: SortEnumType
+  updatedAt: SortEnumType
+  title: SortEnumType
+}
+
+# Payload Types
+type LoginPayload {
+  """JWT token for authentication."""
+  token: String
+  
+  """Authenticated user information."""
+  user: User
+  
+  """Error message if login failed."""
+  errorMessage: String
+}
+
+type CreateOrderPayload {
+  """Created order."""
+  order: Order
+  
+  """Error message if creation failed."""
+  errorMessage: String
+}
+
+type UpdateOrderPayload {
+  """Updated order."""
+  order: Order
+  
+  """Error message if update failed."""
+  errorMessage: String
+}
+
+type DeleteOrderPayload {
+  """Whether the deletion was successful."""
+  success: Boolean!
+  
+  """Error message if deletion failed."""
+  errorMessage: String
+}
+
+type AddOrderItemPayload {
+  """Added item."""
+  item: OrderItem
+  
+  """Error message if addition failed."""
+  errorMessage: String
+}
+
+type RemoveOrderItemPayload {
+  """Whether the removal was successful."""
+  success: Boolean!
+  
+  """Error message if removal failed."""
+  errorMessage: String
+}
+
+# Filter and Sort Types (from HotChocolate.Data)
+input StringOperationFilterInput {
+  eq: String
+  contains: String
+  startsWith: String
+  endsWith: String
+}
+
+input OrderStatusOperationFilterInput {
+  eq: OrderStatus
+  neq: OrderStatus
+  in: [OrderStatus!]
+}
+
+enum SortEnumType {
+  ASC
+  DESC
+}
+
+# Scalar Types
+scalar DateTime
+scalar Decimal

@@ -1,0 +1,320 @@
+@page "/orders/{Id}/edit"
+@attribute [Authorize]
+@inject IOrderService OrderService
+@inject NavigationManager Navigation
+
+<PageTitle>Edit Order - ByteDefence</PageTitle>
+
+<div class="edit-order-page">
+    <div class="page-header">
+        <button class="btn btn-back" @onclick="GoBack">← Back to Order</button>
+        <h1>Edit Order</h1>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="loading">
+            <div class="spinner-large"></div>
+            <p>Loading order...</p>
+        </div>
+    }
+    else if (_error != null && _order == null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else if (_order != null)
+    {
+        @if (_error != null)
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="form-card">
+            <EditForm Model="@_model" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+
+                <div class="form-group">
+                    <label for="title">Title *</label>
+                    <InputText id="title" class="form-control" @bind-Value="_model.Title" placeholder="Enter order title" />
+                    <ValidationMessage For="@(() => _model.Title)" />
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <InputTextArea id="description" class="form-control" @bind-Value="_model.Description"
+                        placeholder="Enter order description" rows="4" />
+                </div>
+
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <InputSelect id="status" class="form-control" @bind-Value="_model.Status">
+                        @foreach (var status in Enum.GetValues<OrderStatus>())
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" @onclick="GoBack">Cancel</button>
+                    <button type="submit" class="btn btn-primary" disabled="@_isSubmitting">
+                        @if (_isSubmitting)
+                        {
+                            <span class="spinner"></span> <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Save Changes</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    }
+</div>
+
+<style>
+    .edit-order-page {
+        padding: 1rem;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        margin-bottom: 1.5rem;
+    }
+
+    .page-header h1 {
+        margin: 1rem 0 0 0;
+    }
+
+    .btn-back {
+        background: transparent;
+        border: none;
+        color: #5c6bc0;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1rem;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #5c6bc0;
+    }
+
+    textarea.form-control {
+        resize: vertical;
+    }
+
+    select.form-control {
+        appearance: auto;
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+    }
+
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+
+    .btn-primary {
+        background: #5c6bc0;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #3f51b5;
+    }
+
+    .btn-primary:disabled {
+        background: #9fa8da;
+        cursor: not-allowed;
+    }
+
+    .btn-secondary {
+        background: #e0e0e0;
+        color: #333;
+    }
+
+    .alert {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+
+    .alert-danger {
+        background: #ffebee;
+        color: #c62828;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 3rem;
+    }
+
+    .spinner-large {
+        width: 3rem;
+        height: 3rem;
+        border: 4px solid #e0e0e0;
+        border-top-color: #5c6bc0;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 1rem;
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        border-top-color: transparent;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @@keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+
+    private OrderDto? _order;
+    private EditOrderModel _model = new();
+    private bool _isLoading = true;
+    private bool _isSubmitting;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrder();
+    }
+
+    private async Task LoadOrder()
+    {
+        _isLoading = true;
+        _error = null;
+
+        try
+        {
+            var response = await OrderService.GetOrderAsync(Id);
+            _order = response?.Order;
+
+            if (_order != null)
+            {
+                _model = new EditOrderModel
+                    {
+                        Title = _order.Title,
+                        Description = _order.Description
+                    };
+
+                if (Enum.TryParse<OrderStatus>(_order.Status, true, out var status))
+                {
+                    _model.Status = status;
+                }
+            }
+            else
+            {
+                _error = "Order not found";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        _isSubmitting = true;
+        _error = null;
+
+        try
+        {
+            var response = await OrderService.UpdateOrderAsync(Id, _model.Title, _model.Description, _model.Status);
+
+            if (response?.UpdateOrder?.Order != null)
+            {
+                // Update the local state
+                if (_order != null)
+                {
+                    var updatedOrder = response.UpdateOrder.Order;
+                    // Preserve items if not returned/updated
+                    if (updatedOrder.Items == null || !updatedOrder.Items.Any())
+                    {
+                        updatedOrder.Items = _order.Items;
+                    }
+                    // Preserve creator info if not returned/updated
+                    if (updatedOrder.CreatedBy == null)
+                    {
+                        updatedOrder.CreatedBy = _order.CreatedBy;
+                    }
+                }
+                Navigation.NavigateTo($"/orders/{Id}");
+            }
+            else
+            {
+                _error = response?.UpdateOrder?.ErrorMessage ?? "Failed to update order";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo($"/orders/{Id}");
+    }
+
+    private class EditOrderModel
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public OrderStatus Status { get; set; } = OrderStatus.Draft;
+    }
+}
