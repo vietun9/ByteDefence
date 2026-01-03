@@ -38,9 +38,9 @@ public class JwtAuthenticationMiddleware : IFunctionsWorkerMiddleware
 
         if (!_skipJwtValidation)
         {
-            var secret = configuration["Jwt:Secret"] ?? "ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!";
-            var issuer = configuration["Jwt:Issuer"] ?? "ByteDefence";
-            var audience = configuration["Jwt:Audience"] ?? "ByteDefence-API";
+            var secret = configuration["Jwt:Secret"] ?? JwtDefaults.DevelopmentSecret;
+            var issuer = configuration["Jwt:Issuer"] ?? JwtDefaults.DefaultIssuer;
+            var audience = configuration["Jwt:Audience"] ?? JwtDefaults.DefaultAudience;
 
             _validationParameters = new TokenValidationParameters
             {
@@ -140,10 +140,16 @@ public class JwtAuthenticationMiddleware : IFunctionsWorkerMiddleware
     /// </summary>
     private ClaimsPrincipal? ValidateToken(string token)
     {
+        if (_validationParameters == null)
+        {
+            _logger.LogError("Token validation parameters not configured");
+            return null;
+        }
+
         try
         {
             var handler = new JwtSecurityTokenHandler();
-            var principal = handler.ValidateToken(token, _validationParameters!, out _);
+            var principal = handler.ValidateToken(token, _validationParameters, out _);
             return principal;
         }
         catch (Exception ex)

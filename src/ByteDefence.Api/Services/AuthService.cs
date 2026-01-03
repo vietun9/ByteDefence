@@ -21,9 +21,9 @@ public class AuthService : IAuthService
 
     public AuthService(IConfiguration configuration)
     {
-        _secret = configuration["Jwt:Secret"] ?? "ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!";
-        _issuer = configuration["Jwt:Issuer"] ?? "ByteDefence";
-        _audience = configuration["Jwt:Audience"] ?? "ByteDefence-API";
+        _secret = configuration["Jwt:Secret"] ?? JwtDefaults.DevelopmentSecret;
+        _issuer = configuration["Jwt:Issuer"] ?? JwtDefaults.DefaultIssuer;
+        _audience = configuration["Jwt:Audience"] ?? JwtDefaults.DefaultAudience;
     }
 
     public string GenerateToken(User user)
