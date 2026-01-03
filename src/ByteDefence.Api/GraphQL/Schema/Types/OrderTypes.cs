@@ -1,7 +1,5 @@
-using ByteDefence.Api.Data;
 using ByteDefence.Api.GraphQL.DataLoaders;
 using ByteDefence.Shared.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace ByteDefence.Api.GraphQL.Schema.Types;
 
