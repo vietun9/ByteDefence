@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/ByteDefence.Api/Dockerfile
+    ports:
+      - "7071:80"
+    environment:
+      - AzureWebJobsStorage=UseDevelopmentStorage=true
+      - FUNCTIONS_WORKER_RUNTIME=dotnet-isolated
+      - UseCosmosDb=false
+      - SignalR__Mode=Local
+      - SignalR__HubUrl=http://signalr:5000
+      - Jwt__Secret=ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!
+      - Jwt__Issuer=ByteDefence
+      - Jwt__Audience=ByteDefence-API
+    depends_on:
+      - signalr
+    networks:
+      - bytedefence-network
+
+  signalr:
+    build:
+      context: .
+      dockerfile: src/ByteDefence.SignalR/Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_URLS=http://+:5000
+    networks:
+      - bytedefence-network
+
+  web:
+    build:
+      context: .
+      dockerfile: src/ByteDefence.Web/Dockerfile
+    ports:
+      - "8080:80"
+    environment:
+      - Api__Url=http://localhost:7071/api/graphql
+      - SignalR__HubUrl=http://localhost:5000/hubs/notifications
+    depends_on:
+      - api
+      - signalr
+    networks:
+      - bytedefence-network
+
+networks:
+  bytedefence-network:
+    driver: bridge

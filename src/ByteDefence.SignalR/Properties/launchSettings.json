@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "ByteDefence.SignalR": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:62702;http://localhost:62703"
+    }
+  }
+}

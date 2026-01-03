@@ -1,0 +1,12 @@
+{
+    "profiles": {
+        "ByteDefence.Api": {
+            "commandName": "Project",
+            "environmentVariables": {
+              "AZURE_FUNCTIONS_ENVIRONMENT": "Development",
+              "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+              "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
+            }
+        }
+    }
+}

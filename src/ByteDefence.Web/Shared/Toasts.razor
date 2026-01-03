@@ -1,0 +1,32 @@
+@inject ByteDefence.Web.Services.ToastService ToastService
+
+<div class="toast-container" style="position:fixed;top:1rem;right:1rem;z-index:1200;">
+    @foreach (var t in ToastService.Toasts)
+    {
+        <div class="toast show mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto">@t.Level</strong>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="() => Dismiss(t.Id)"></button>
+            </div>
+            <div class="toast-body">
+                @t.Message
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        ToastService.OnToastsChanged += InvokeStateHasChanged;
+    }
+
+    private void InvokeStateHasChanged() => InvokeAsync(StateHasChanged);
+
+    private void Dismiss(string id) => ToastService.Remove(id);
+
+    public void Dispose()
+    {
+        ToastService.OnToastsChanged -= InvokeStateHasChanged;
+    }
+}

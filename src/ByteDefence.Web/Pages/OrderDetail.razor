@@ -1,0 +1,676 @@
+@page "/orders/{Id}"
+@attribute [Authorize]
+@inject IOrderService OrderService
+@inject ISignalRService SignalR
+@inject NavigationManager Navigation
+@inject OrderState OrderState
+@inject ToastService ToastService
+@implements IDisposable
+
+<PageTitle>Order Details - ByteDefence</PageTitle>
+
+<div class="order-detail-page">
+    <div class="page-header">
+        <button class="btn btn-back" @onclick="GoBack">← Back to Orders</button>
+        <ConnectionStatus State="@_connectionState" />
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="loading">
+            <div class="spinner-large"></div>
+            <p>Loading order...</p>
+        </div>
+    }
+    else if (_error != null)
+    {
+        <div class="alert alert-danger">
+            <strong>Error:</strong> @_error
+            <button class="btn btn-sm" @onclick="LoadOrder">Retry</button>
+        </div>
+    }
+    else if (_order == null)
+    {
+        <div class="alert alert-warning">Order not found.</div>
+    }
+    else
+    {
+        @if (_hasUpdate)
+        {
+            <div class="alert alert-info update-banner">
+                This order has been updated. <button class="btn btn-link" @onclick="LoadOrder">Refresh</button>
+            </div>
+        }
+
+        <div class="order-content">
+            <div class="order-main">
+                <div class="order-header-card">
+                    <div class="order-title-row">
+                        <h1>@_order.Title</h1>
+                        <span class="status-badge @GetStatusClass(_order.Status)">@_order.Status</span>
+                    </div>
+                    <p class="order-description">@_order.Description</p>
+                    <div class="order-actions">
+                        <button class="btn btn-primary" @onclick="NavigateToEdit">Edit Order</button>
+                        <AuthorizeView Roles="Admin">
+                            <button class="btn btn-danger" @onclick="DeleteOrder" disabled="@_isDeleting">
+                                @if (_isDeleting) { <span>Deleting...</span> } else { <span>Delete</span> }
+                            </button>
+                        </AuthorizeView>
+                    </div>
+                </div>
+
+                <div class="items-section">
+                    <div class="section-header">
+                        <h2>Order Items</h2>
+                        <button class="btn btn-secondary" @onclick="ShowAddItemForm">+ Add Item</button>
+                    </div>
+
+                    @if (_showAddItem)
+                    {
+                        <div class="add-item-form">
+                            <input type="text" @bind="_newItemName" placeholder="Item name" />
+                            <input type="number" @bind="_newItemQuantity" placeholder="Qty" min="1" />
+                            <input type="number" @bind="_newItemPrice" placeholder="Price" step="0.01" min="0" />
+                            <button class="btn btn-primary" @onclick="AddItem">Add</button>
+                            <button class="btn btn-secondary" @onclick="CancelAddItem">Cancel</button>
+                        </div>
+                    }
+
+                    @if (!_order.Items.Any())
+                    {
+                        <div class="empty-items">No items in this order.</div>
+                    }
+                    else
+                    {
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Quantity</th>
+                                    <th>Price</th>
+                                    <th>Subtotal</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in _order.Items)
+                                {
+                                    <tr>
+                                        <td>@item.Name</td>
+                                        <td>@item.Quantity</td>
+                                        <td>@item.Price.ToString("C")</td>
+                                        <td>@item.Subtotal.ToString("C")</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-danger" @onclick="() => RemoveItem(item.Id)">×</button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3"><strong>Total</strong></td>
+                                    <td colspan="2"><strong>@_order.Total.ToString("C")</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    }
+                </div>
+            </div>
+
+            <div class="order-sidebar">
+                <div class="info-card">
+                    <h3>Order Info</h3>
+                    <dl>
+                        <dt>Order ID</dt>
+                        <dd>@_order.Id</dd>
+                        <dt>Created By</dt>
+                        <dd>@(_order.CreatedBy?.Username ?? "Unknown")</dd>
+                        <dt>Created</dt>
+                        <dd>@_order.CreatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</dd>
+                        <dt>Last Updated</dt>
+                        <dd>@_order.UpdatedAt.ToLocalTime().ToString("MMM dd, yyyy HH:mm")</dd>
+                    </dl>
+                </div>
+
+                <div class="status-card">
+                    <h3>Update Status</h3>
+                    <select @bind="_selectedStatus" class="form-control">
+                        @foreach (var status in Enum.GetValues<OrderStatus>())
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </select>
+                    <button class="btn btn-primary" @onclick="UpdateStatus" disabled="@_isUpdating">
+                        @if (_isUpdating) { <span>Updating...</span> } else { <span>Update Status</span> }
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .order-detail-page {
+        padding: 1rem;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .btn-back {
+        background: transparent;
+        border: none;
+        color: #5c6bc0;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+
+    .order-content {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 1.5rem;
+    }
+
+    .order-header-card, .items-section, .info-card, .status-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+
+    .order-title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .order-title-row h1 {
+        margin: 0;
+        font-size: 1.5rem;
+    }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+
+    .status-draft { background: #e0e0e0; color: #424242; }
+    .status-pending { background: #fff3e0; color: #e65100; }
+    .status-approved { background: #e3f2fd; color: #1565c0; }
+    .status-completed { background: #e8f5e9; color: #2e7d32; }
+    .status-cancelled { background: #ffebee; color: #c62828; }
+
+    .order-description {
+        color: #666;
+        margin-bottom: 1rem;
+    }
+
+    .order-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .section-header h2 {
+        margin: 0;
+        font-size: 1.2rem;
+    }
+
+    .add-item-form {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        background: #f5f5f5;
+        border-radius: 4px;
+    }
+
+    .add-item-form input {
+        padding: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .add-item-form input[type="text"] {
+        flex: 2;
+    }
+
+    .add-item-form input[type="number"] {
+        width: 80px;
+    }
+
+    .items-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .items-table th, .items-table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+
+    .items-table th {
+        font-weight: 500;
+        color: #666;
+    }
+
+    .items-table tfoot td {
+        border-top: 2px solid #ddd;
+        font-weight: 600;
+    }
+
+    .empty-items {
+        text-align: center;
+        padding: 2rem;
+        color: #999;
+    }
+
+    .info-card h3, .status-card h3 {
+        font-size: 1rem;
+        margin-bottom: 1rem;
+        color: #333;
+    }
+
+    .info-card dl {
+        margin: 0;
+    }
+
+    .info-card dt {
+        font-size: 0.8rem;
+        color: #999;
+        margin-top: 0.75rem;
+    }
+
+    .info-card dd {
+        margin: 0;
+        font-weight: 500;
+    }
+
+    .status-card select {
+        width: 100%;
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .status-card button {
+        width: 100%;
+    }
+
+    .btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+
+    .btn-primary { background: #5c6bc0; color: white; }
+    .btn-primary:hover { background: #3f51b5; }
+    .btn-secondary { background: #e0e0e0; color: #333; }
+    .btn-danger { background: #e53935; color: white; }
+    .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+    .btn-link { background: none; color: inherit; text-decoration: underline; }
+
+    .alert {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+
+    .alert-danger { background: #ffebee; color: #c62828; }
+    .alert-warning { background: #fff3e0; color: #e65100; }
+    .alert-info { background: #e3f2fd; color: #1565c0; }
+
+    .loading {
+        text-align: center;
+        padding: 3rem;
+    }
+
+    .spinner-large {
+        width: 3rem;
+        height: 3rem;
+        border: 4px solid #e0e0e0;
+        border-top-color: #5c6bc0;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 1rem;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    @@media (max-width: 768px) {
+        .order-content {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = string.Empty;
+
+    private OrderDto? _order;
+    private bool _isLoading = true;
+    private string? _error;
+    private bool _hasUpdate;
+    private bool _showAddItem;
+    private bool _isDeleting;
+    private bool _isUpdating;
+    private string _selectedStatus = "Draft";
+    private HubConnectionState _connectionState = HubConnectionState.Disconnected;
+    private Action<HubConnectionState>? _stateHandler;
+
+    // New item form
+    private string _newItemName = string.Empty;
+    private int _newItemQuantity = 1;
+    private decimal _newItemPrice = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrder();
+        // subscribe to local state changes
+        OrderState.OnChange += OnOrderStateChanged;
+        await SetupSignalR();
+    }
+
+    private async Task LoadOrder()
+    {
+        _isLoading = true;
+        _error = null;
+        _hasUpdate = false;
+        StateHasChanged();
+
+        try
+        {
+            var response = await OrderService.GetOrderAsync(Id);
+            _order = response?.Order;
+            if (_order != null)
+            {
+                if (Enum.TryParse<OrderStatus>(_order.Status, true, out var parsed))
+                {
+                    _selectedStatus = parsed.ToString();
+                }
+                else
+                {
+                    _selectedStatus = _order.Status;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SetupSignalR()
+    {
+        _stateHandler = state =>
+        {
+            _connectionState = state;
+            InvokeAsync(StateHasChanged);
+        };
+
+        SignalR.OnStateChanged += _stateHandler;
+        SignalR.OnOrderUpdated += HandleOrderUpdated;
+
+        try
+        {
+            await SignalR.StartAsync();
+            await SignalR.JoinOrderGroupAsync(Id);
+            _connectionState = SignalR.State;
+            
+            // Safety net: force a reload after joining in case we missed an update
+            await LoadOrder();
+        }
+        catch
+        {
+            _connectionState = HubConnectionState.Disconnected;
+        }
+    }
+
+    private async void HandleOrderUpdated(object data)
+    {
+        // When an update is received, we should fetch the latest order details
+        // to ensure we have the full object graph (items, creator, etc.)
+        // relying on the broadcast payload might result in partial data if the backend didn't include everything
+        try
+        {
+            if (data is System.Text.Json.JsonElement json)
+            {
+                // We only really need the ID to refetch, but let's try to get ID from the payload
+                string? orderId = null;
+                // Try case-insensitive property access for "Id" or "id"
+                if (json.TryGetProperty("id", out var idElement) || json.TryGetProperty("Id", out idElement))
+                {
+                    orderId = idElement.GetString();
+                }
+
+                // If ID matches, reload silently and update OrderState
+                if (!string.IsNullOrEmpty(orderId) && orderId == Id)
+                {
+                   try 
+                   {
+                       var response = await OrderService.GetOrderAsync(Id);
+                       if (response?.Order != null)
+                       {
+                           // Updating OrderState will trigger OnOrderStateChanged, which updates _order and renders UI
+                           OrderState.Upsert(response.Order);
+                           ToastService.ShowInfo("Order updated");
+                       }
+                   }
+                   catch (Exception innerEx)
+                   {
+                       Console.WriteLine($"Failed to silent reload: {innerEx.Message}");
+                   }
+                }
+            }
+        }
+        catch (Exception ex)
+        { 
+            Console.WriteLine($"Error handling OrderUpdated: {ex.Message}");
+        }
+    }
+
+
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/orders");
+    }
+
+    private void NavigateToEdit()
+    {
+        Navigation.NavigateTo($"/orders/{Id}/edit");
+    }
+
+    private async Task DeleteOrder()
+    {
+        _isDeleting = true;
+        try
+        {
+            var response = await OrderService.DeleteOrderAsync(Id);
+            if (response?.DeleteOrder?.Success == true)
+            {
+                Navigation.NavigateTo("/orders");
+            }
+            else
+            {
+                _error = response?.DeleteOrder?.ErrorMessage ?? "Failed to delete order";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isDeleting = false;
+        }
+    }
+
+    private async Task UpdateStatus()
+    {
+        if (_order == null) return;
+
+        _isUpdating = true;
+        try
+        {
+            var status = Enum.Parse<OrderStatus>(_selectedStatus);
+            var response = await OrderService.UpdateOrderAsync(Id, null, null, status);
+            if (response?.UpdateOrder?.Order != null)
+            {
+                // Immediate local update
+                var updated = response.UpdateOrder.Order;
+                OrderState.Upsert(updated);
+                _order = updated;
+                ToastService.ShowSuccess("Order updated");
+            }
+            else
+            {
+                _error = response?.UpdateOrder?.ErrorMessage ?? "Failed to update status";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _isUpdating = false;
+        }
+    }
+
+    private void ShowAddItemForm()
+    {
+        _showAddItem = true;
+    }
+
+    private void CancelAddItem()
+    {
+        _showAddItem = false;
+        _newItemName = string.Empty;
+        _newItemQuantity = 1;
+        _newItemPrice = 0;
+    }
+
+    private async Task AddItem()
+    {
+        if (string.IsNullOrWhiteSpace(_newItemName)) return;
+
+        try
+        {
+            var response = await OrderService.AddOrderItemAsync(Id, _newItemName, _newItemQuantity, _newItemPrice);
+            if (response?.AddOrderItem?.Item != null)
+            {
+                // Optimistically update local order state with returned item
+                var item = response.AddOrderItem.Item;
+                CancelAddItem();
+                if (_order != null)
+                {
+                    _order.Items.Add(item);
+                    // recompute totals if available
+                    _order.Total = _order.Items.Sum(i => i.Subtotal);
+                    _order.UpdatedAt = DateTime.UtcNow;
+                    OrderState.Upsert(_order);
+                    ToastService.ShowSuccess("Item added");
+                }
+            }
+            else
+            {
+                _error = response?.AddOrderItem?.ErrorMessage ?? "Failed to add item";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task RemoveItem(string itemId)
+    {
+        try
+        {
+            var response = await OrderService.RemoveOrderItemAsync(itemId);
+            if (response?.RemoveOrderItem?.Success == true)
+            {
+                if (_order != null)
+                {
+                    var idx = _order.Items.FindIndex(i => i.Id == itemId);
+                    if (idx >= 0)
+                    {
+                        _order.Items.RemoveAt(idx);
+                        _order.Total = _order.Items.Sum(i => i.Subtotal);
+                        _order.UpdatedAt = DateTime.UtcNow;
+                        OrderState.Upsert(_order);
+                        ToastService.ShowInfo("Item removed");
+                    }
+                }
+            }
+            else
+            {
+                _error = response?.RemoveOrderItem?.ErrorMessage ?? "Failed to remove item";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private string GetStatusClass(string status) => status.ToLower() switch
+    {
+        "draft" => "status-draft",
+        "pending" => "status-pending",
+        "approved" => "status-approved",
+        "completed" => "status-completed",
+        "cancelled" => "status-cancelled",
+        _ => ""
+    };
+
+    public void Dispose()
+    {
+        // leave SignalR group and unsubscribe handlers
+        SignalR.LeaveOrderGroupAsync(Id).ConfigureAwait(false);
+        SignalR.LeaveOrderGroupAsync(Id).ConfigureAwait(false);
+        if (_stateHandler != null)
+            SignalR.OnStateChanged -= _stateHandler;
+        SignalR.OnOrderUpdated -= HandleOrderUpdated;
+        OrderState.OnChange -= OnOrderStateChanged;
+    }
+
+    private void OnOrderStateChanged()
+    {
+        // if state changed for this order, pick it up
+        var updated = OrderState.Get(Id);
+        if (updated != null)
+        {
+            _order = updated;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+}

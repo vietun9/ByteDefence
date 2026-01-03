@@ -1,0 +1,240 @@
+﻿@page "/"
+@inject IAuthService AuthService
+@inject IOrderService OrderService
+@inject NavigationManager Navigation
+
+<PageTitle>ByteDefence - Dashboard</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="dashboard">
+            <h1>👋 Welcome to ByteDefence</h1>
+            
+            @if (_isLoading)
+            {
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading dashboard...</p>
+                </div>
+            }
+            else if (_stats != null)
+            {
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">@_stats.TotalOrders</div>
+                        <div class="stat-label">Total Orders</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">@_stats.PendingOrders</div>
+                        <div class="stat-label">Pending</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">@_stats.TotalValue.ToString("C")</div>
+                        <div class="stat-label">Total Value</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">@_stats.TotalUsers</div>
+                        <div class="stat-label">Users</div>
+                    </div>
+                </div>
+            }
+
+            <div class="quick-actions">
+                <h2>Quick Actions</h2>
+                <div class="actions-grid">
+                    <button class="action-card" @onclick='() => Navigation.NavigateTo("/orders")'>
+                        <span class="action-icon">📦</span>
+                        <span class="action-text">View Orders</span>
+                    </button>
+                    <button class="action-card" @onclick='() => Navigation.NavigateTo("/orders/new")'>
+                        <span class="action-icon">➕</span>
+                        <span class="action-text">New Order</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="welcome">
+            <h1>🛡️ ByteDefence</h1>
+            <p>Modern GraphQL API with Blazor WASM Frontend</p>
+            <button class="btn btn-primary" @onclick='() => Navigation.NavigateTo("/login")'>
+                Login to Get Started
+            </button>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+<style>
+    .dashboard, .welcome {
+        padding: 2rem;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .dashboard h1 {
+        margin-bottom: 2rem;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 600;
+        color: #5c6bc0;
+    }
+
+    .stat-label {
+        color: #666;
+        margin-top: 0.5rem;
+    }
+
+    .quick-actions h2 {
+        margin-bottom: 1rem;
+    }
+
+    .actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .action-card {
+        background: white;
+        border: none;
+        border-radius: 8px;
+        padding: 2rem;
+        text-align: center;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .action-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+
+    .action-icon {
+        font-size: 2rem;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+    .action-text {
+        font-weight: 500;
+    }
+
+    .welcome {
+        text-align: center;
+        padding-top: 4rem;
+    }
+
+    .welcome h1 {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .welcome p {
+        font-size: 1.2rem;
+        color: #666;
+        margin-bottom: 2rem;
+    }
+
+    .features {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .feature {
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .btn-primary {
+        background: #5c6bc0;
+        color: white;
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 4px;
+        font-size: 1.1rem;
+        cursor: pointer;
+    }
+
+    .btn-primary:hover {
+        background: #3f51b5;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 2rem;
+    }
+
+    .spinner {
+        width: 3rem;
+        height: 3rem;
+        border: 4px solid #e0e0e0;
+        border-top-color: #5c6bc0;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 1rem;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+
+@code {
+    private OrderStatsDto? _stats;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (await AuthService.IsAuthenticatedAsync())
+        {
+            await LoadStats();
+        }
+        else
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadStats()
+    {
+        try
+        {
+            var response = await OrderService.GetOrderStatsAsync();
+            _stats = response?.OrderStats;
+        }
+        catch
+        {
+            // Silently fail for stats
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
