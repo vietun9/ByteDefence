@@ -22,15 +22,37 @@
 
 ---
 
-## 3. Auth Path: Custom JWT (Lite)
+## 3. Auth Path: ASP.NET Core Integration (JWT Bearer)
 
-**Decision:** **Custom JWT Implementation** with **Key Vault** storage.
+**Decision:** **ASP.NET Core style JWT Bearer Authentication** with middleware and optional APIM/Gateway trust.
+
+**Architecture:**
+```
+Client
+  ↓
+APIM / App Service Gateway (optional)
+  - JWT validation (optional)
+  - Rate limiting
+  - WAF / routing
+  ↓
+Azure Functions (.NET 8, ASP.NET Core style)
+  - JwtAuthenticationMiddleware
+  - HotChocolate GlobalState authorization
+```
+
 **Reason:**
+*   **Flexibility**: Supports three deployment scenarios:
+    1. **Full validation**: API validates JWT (default)
+    2. **APIM trust**: APIM validates JWT, API trusts the token (`Auth:SkipJwtValidation=true`)
+    3. **Gateway trust**: App Service Gateway handles auth, API trusts headers
 *   **Realism**: Uses real `HMACSHA256` signing and validation (not just a string check).
 *   **Security**: 
     *   Secrets stored in **Azure Key Vault**.
     *   Function App accesses secret via **Managed Identity**.
-*   **Simplicity**: Avoids the hefty configuration overhead of full Azure AD B2C for this specific demo, while demonstrating proper Bearer token handling.
+*   **Configuration**: `Auth:SkipJwtValidation` setting allows switching between validation modes.
+*   **Clean Architecture**:
+    *   APIM = coarse-grained auth (token validation, rate limits)
+    *   API = fine-grained auth (roles, policies, business rules)
 
 ---
 

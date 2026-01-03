@@ -67,5 +67,5 @@ ByteDefence/
 
 *   **GraphQL API**: Full CRUD with HotChocolate.
 *   **Real-time**: SignalR integration for live order updates.
-*   **Security**: JWT Authentication (Custom Mock implementation).
+*   **Security**: JWT Bearer Authentication (ASP.NET Core style middleware with APIM/Gateway trust option).
 *   **Infrastructure**: Bicep templates for full Azure provisioning.

@@ -1,13 +1,34 @@
 # Testing Guide
 
-# Testing Guide
-
 ## Test Credentials
 
 | Role | Username | Password | Notes |
 |------|----------|----------|-------|
 | **Admin** | `admin` | `admin123` | Can delete orders |
 | **User** | `user` | `user123` | Standard access |
+
+## Authentication Architecture
+
+The API uses ASP.NET Core style JWT Bearer authentication with flexible deployment options:
+
+```
+Client
+  ↓
+APIM / App Service Gateway (optional)
+  - JWT validation (optional)
+  - Rate limiting
+  ↓
+Azure Functions (.NET 8)
+  - JwtAuthenticationMiddleware
+  - HotChocolate GraphQL with GlobalState authorization
+```
+
+### Configuration Options
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| `Auth:SkipJwtValidation` | `false` (default) | API validates JWT token |
+| `Auth:SkipJwtValidation` | `true` | Trust APIM/Gateway validation, parse claims only |
 
 ## Tools
 

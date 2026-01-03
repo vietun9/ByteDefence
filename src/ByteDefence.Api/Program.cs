@@ -17,7 +17,10 @@ using ByteDefence.Api.Middleware;
 var host = new HostBuilder()
     .ConfigureFunctionsWorkerDefaults(worker =>
     {
+        // CORS middleware runs first
         worker.UseMiddleware<CorsMiddleware>();
+        // JWT Authentication middleware runs second (before function execution)
+        worker.UseMiddleware<JwtAuthenticationMiddleware>();
     })
     .ConfigureServices((context, services) =>
     {
@@ -72,6 +75,8 @@ var host = new HostBuilder()
         }
 
         // Configure HotChocolate GraphQL with DataLoaders
+        // Note: Authorization is handled via GlobalState pattern in resolvers
+        // because Azure Functions isolated model doesn't support ASP.NET Core middleware stack
         services
             .AddGraphQLServer()
             .AddQueryType<OrderQueryResolver>()

@@ -9,6 +9,7 @@
     "Jwt__Secret": "ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!",
     "Jwt__Issuer": "ByteDefence",
     "Jwt__Audience": "ByteDefence-API",
+    "Auth__SkipJwtValidation": "false",
     "Cors__AllowedOrigins__0": "http://localhost:8080",
     "Cors__AllowedOrigins__1": "http://localhost:5001"
   },
