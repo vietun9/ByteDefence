@@ -1,5 +1,10 @@
+using System.IdentityModel.Tokens.Jwt;
 using FluentAssertions;
 using HotChocolate.Execution;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+using ByteDefence.Api.Options;
 using Xunit;
 
 namespace ByteDefence.Api.Tests.Integration;
@@ -149,8 +154,22 @@ public class AuthIntegrationTests : GraphQLIntegrationTestBase
         var login = data!["login"] as IReadOnlyDictionary<string, object?>;
         var token = login!["token"]!.ToString();
 
-        // Assert - validate the token using AuthService
-        var principal = AuthService.ValidateToken(token!);
+        // Assert - validate the token using configured JWT options
+        var jwtOptions = ServiceProvider.GetRequiredService<IOptions<JwtOptions>>().Value;
+        var handler = new JwtSecurityTokenHandler();
+        var validationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtOptions.SigningKey)),
+            ValidateIssuer = true,
+            ValidIssuer = jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = jwtOptions.Audience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+
+        var principal = handler.ValidateToken(token!, validationParameters, out _);
         principal.Should().NotBeNull();
     }
 }

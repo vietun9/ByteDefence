@@ -64,11 +64,18 @@ The web app will be available at `http://localhost:5001` (or the port shown)
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "UseCosmosDb": "false",
-    "SignalR__Mode": "Local",
-    "SignalR__HubUrl": "http://localhost:5000",
-    "Jwt__Secret": "ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!",
-    "Jwt__Issuer": "ByteDefence",
-    "Jwt__Audience": "ByteDefence-API"
+    "SignalR:Mode": "Local",
+    "SignalR:HubUrl": "http://localhost:5000",
+    "Jwt:Issuer": "ByteDefence",
+    "Jwt:Audience": "ByteDefence-API",
+    "Jwt:SigningKey": "Key-For-Development-Only-32Chars",
+    "Jwt:TokenLifetimeMinutes": "60",
+    "Auth:SkipJwtValidation": "false"
+  },
+  "Host": {
+    "LocalHttpPort": 7071,
+    "CORS": "http://localhost:8080,http://localhost:5001",
+    "CORSCredentials": true
   }
 }
 ```
@@ -112,6 +119,6 @@ To deploy this application to Azure (including Key Vault, SignalR Service, and F
 
 | Service | File | Key Variables |
 |---------|------|---------------|
-| **API** | `local.settings.json` | `Jwt__Secret`, `SignalR__HubUrl`, `UseCosmosDb` |
+| **API** | `local.settings.json` | `Jwt:SigningKey`, `Jwt:Issuer`, `Jwt:Audience`, `SignalR:HubUrl`, `UseCosmosDb` |
 | **Web** | `wwwroot/appsettings.json` | `Api:Url`, `SignalR:HubUrl` |
 

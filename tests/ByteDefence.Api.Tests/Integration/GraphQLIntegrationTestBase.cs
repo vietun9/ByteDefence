@@ -4,7 +4,9 @@ using ByteDefence.Api.GraphQL.DataLoaders;
 using ByteDefence.Api.GraphQL.Schema.Mutations;
 using ByteDefence.Api.GraphQL.Schema.Queries;
 using ByteDefence.Api.GraphQL.Schema.Types;
+using ByteDefence.Api.Options;
 using ByteDefence.Api.Services;
+using ByteDefence.Api.Tests.Support;
 using ByteDefence.Shared.Models;
 using HotChocolate;
 using HotChocolate.Execution;
@@ -37,12 +39,15 @@ public abstract class GraphQLIntegrationTestBase : IDisposable
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                { "Jwt:Secret", "ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!" },
+                { "Jwt:SigningKey", "Key-For-Development-Only-32Chars" },
                 { "Jwt:Issuer", "ByteDefence" },
-                { "Jwt:Audience", "ByteDefence-API" }
+                { "Jwt:Audience", "ByteDefence-API" },
+                { "Jwt:TokenLifetimeMinutes", "60" }
             })
             .Build();
         services.AddSingleton<IConfiguration>(configuration);
+
+        services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
 
         // Configure in-memory database with a fixed name per test class instance
         // Using ServiceLifetime.Singleton to share across all scopes
@@ -58,7 +63,7 @@ public abstract class GraphQLIntegrationTestBase : IDisposable
         services.AddScoped<IOrderService, OrderService>();
         services.AddScoped<IUserService, UserService>();
         services.AddSingleton<IAuthService, AuthService>();
-        services.AddSingleton<INotificationService, LocalNotificationService>();
+        services.AddSingleton<INotificationService, TestNotificationService>();
 
         // Configure HotChocolate GraphQL with DataLoaders
         services

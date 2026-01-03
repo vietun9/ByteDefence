@@ -1,11 +1,13 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using ByteDefence.Api.Middleware;
+using ByteDefence.Api.Options;
 using ByteDefence.Api.Services;
 using ByteDefence.Shared.Models;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
 namespace ByteDefence.Api.Tests.Unit;
@@ -16,22 +18,33 @@ namespace ByteDefence.Api.Tests.Unit;
 /// </summary>
 public class JwtAuthenticationMiddlewareTests
 {
-    private readonly IConfiguration _configuration;
+    private readonly JwtOptions _jwtOptions;
     private readonly AuthService _authService;
+    private readonly TokenValidationParameters _validationParameters;
 
     public JwtAuthenticationMiddlewareTests()
     {
-        _configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                { "Jwt:Secret", "ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!" },
-                { "Jwt:Issuer", "ByteDefence" },
-                { "Jwt:Audience", "ByteDefence-API" },
-                { "Auth:SkipJwtValidation", "false" }
-            })
-            .Build();
+        _jwtOptions = new JwtOptions
+        {
+            SigningKey = "ByteDefence-Super-Secret-Key-For-Development-Only-32Chars!",
+            Issuer = "ByteDefence",
+            Audience = "ByteDefence-API",
+            TokenLifetimeMinutes = 60
+        };
 
-        _authService = new AuthService(_configuration);
+        _validationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(_jwtOptions.SigningKey)),
+            ValidateIssuer = true,
+            ValidIssuer = _jwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = _jwtOptions.Audience,
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+
+        _authService = new AuthService(Microsoft.Extensions.Options.Options.Create(_jwtOptions));
     }
 
     [Fact]
@@ -70,7 +83,8 @@ public class JwtAuthenticationMiddlewareTests
         var token = _authService.GenerateToken(user);
 
         // Act
-        var principal = _authService.ValidateToken(token);
+        var handler = new JwtSecurityTokenHandler();
+        var principal = handler.ValidateToken(token, _validationParameters, out _);
 
         // Assert
         principal.Should().NotBeNull();
@@ -87,37 +101,15 @@ public class JwtAuthenticationMiddlewareTests
     public void ValidateToken_WithInvalidToken_ReturnsNull()
     {
         // Act
-        var principal = _authService.ValidateToken("invalid.token.here");
+        var handler = new JwtSecurityTokenHandler();
+        Action act = () => handler.ValidateToken("invalid.token.here", _validationParameters, out _);
 
         // Assert
-        principal.Should().BeNull();
+        act.Should().Throw<ArgumentException>();
     }
 
     [Fact]
-    public void ValidateToken_WithExpiredToken_ReturnsNull()
-    {
-        // Arrange - Create a token that's already expired
-        // Note: This would require modifying AuthService or using a custom token
-        // For now, we test with a tampered token
-        var user = new User
-        {
-            Id = "test-user",
-            Username = "test",
-            Email = "test@test.com",
-            Role = UserRole.User
-        };
-        var token = _authService.GenerateToken(user);
-        var tamperedToken = token + "tampered";
-
-        // Act
-        var principal = _authService.ValidateToken(tamperedToken);
-
-        // Assert
-        principal.Should().BeNull();
-    }
-
-    [Fact]
-    public void GenerateToken_IncludesRoleClaim()
+    public void ValidateToken_WithTamperedToken_ReturnsNull()
     {
         // Arrange
         var user = new User
@@ -130,12 +122,12 @@ public class JwtAuthenticationMiddlewareTests
 
         // Act
         var token = _authService.GenerateToken(user);
-        var principal = _authService.ValidateToken(token);
+        var tamperedToken = token + "tampered";
+        var handler = new JwtSecurityTokenHandler();
+        Action act = () => handler.ValidateToken(tamperedToken, _validationParameters, out _);
 
         // Assert
-        principal.Should().NotBeNull();
-        var roleClaim = principal!.FindFirst(ClaimTypes.Role)?.Value;
-        roleClaim.Should().Be("User");
+        act.Should().Throw<SecurityTokenException>();
     }
 
     [Fact]

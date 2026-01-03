@@ -880,5 +880,10 @@ Access:
 | `SignalR: Mode` | Local | Azure | Azure |
 | `SignalR:HubUrl` | http://localhost:5000 | Azure URL | Azure URL |
 | `UseCosmosDb` | false | true | true |
-| `Jwt:Secret` | dev-secret | env variable | env variable |
+| `Jwt:SigningKey` | dev secret | env variable | env variable |
 | `Jwt:Issuer` | localhost | Azure URL | Azure URL |
+| `Jwt:Audience` | byte defence | byte defence | byte defence |
+| `Jwt:TokenLifetimeMinutes` | 60 | 60 | 60 |
+| `CosmosDb:ConnectionString` | N/A | env variable | env variable |
+| `UseCosmosDb` | false | true | true |
+| `Auth:SkipJwtValidation` | false | false | false |

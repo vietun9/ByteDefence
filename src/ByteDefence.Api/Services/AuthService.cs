@@ -2,7 +2,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using ByteDefence.Shared.Models;
-using Microsoft.Extensions.Configuration;
+using ByteDefence.Api.Options;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace ByteDefence.Api.Services;
@@ -10,25 +11,20 @@ namespace ByteDefence.Api.Services;
 public interface IAuthService
 {
     string GenerateToken(User user);
-    ClaimsPrincipal? ValidateToken(string token);
 }
 
 public class AuthService : IAuthService
 {
-    private readonly string _secret;
-    private readonly string _issuer;
-    private readonly string _audience;
+    private readonly JwtOptions _jwtOptions;
 
-    public AuthService(IConfiguration configuration)
+    public AuthService(IOptions<JwtOptions> jwtOptions)
     {
-        _secret = configuration["Jwt:Secret"] ?? JwtDefaults.DevelopmentSecret;
-        _issuer = configuration["Jwt:Issuer"] ?? JwtDefaults.DefaultIssuer;
-        _audience = configuration["Jwt:Audience"] ?? JwtDefaults.DefaultAudience;
+        _jwtOptions = jwtOptions.Value;
     }
 
     public string GenerateToken(User user)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
@@ -42,41 +38,13 @@ public class AuthService : IAuthService
         };
 
         var token = new JwtSecurityToken(
-            issuer: _issuer,
-            audience: _audience,
+            issuer: _jwtOptions.Issuer,
+            audience: _jwtOptions.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(8),
+            expires: DateTime.UtcNow.AddMinutes(_jwtOptions.TokenLifetimeMinutes),
             signingCredentials: credentials
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    public ClaimsPrincipal? ValidateToken(string token)
-    {
-        try
-        {
-            var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.UTF8.GetBytes(_secret);
-
-            var validationParameters = new TokenValidationParameters
-            {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(key),
-                ValidateIssuer = true,
-                ValidIssuer = _issuer,
-                ValidateAudience = true,
-                ValidAudience = _audience,
-                ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero
-            };
-
-            var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
-            return principal;
-        }
-        catch
-        {
-            return null;
-        }
     }
 }
